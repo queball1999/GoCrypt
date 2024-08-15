@@ -1,12 +1,11 @@
-// go: generate goversioninfo -icon = gocrypt.ico
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"os"
 	"time"
-	"errors"
 
 	"GoCrypt/encryption"
 	"GoCrypt/ui"
@@ -16,10 +15,12 @@ import (
 	"fyne.io/fyne/v2/dialog"
 )
 
-const defaultLayers = 5
+const defaultLayers = 10
 
 // FIXME: - Implement a failsafe to prevent the application from encrypting its own files.
 //        - The application should automatically detect file types. If the file has a .enc extension, it should only attempt decryption. For any other file type, suggest encryption.
+//		  - Optimize RAM usage
+//		  - Associate .enc files with application
 
 func main() {
 	// Define command-line flags
@@ -78,7 +79,7 @@ func encryptFile(application fyne.App, filePath string, key []byte, method strin
 		progressBar.SetValue(float64(i + 1))
 		time.Sleep(10 * time.Millisecond) //needed so the UI can catch up
 	}
-	
+
 	outputPath := filePath + ".enc"
 	err = os.WriteFile(outputPath, inputData, 0644)
 	if err != nil {
@@ -117,7 +118,7 @@ func decryptFile(application fyne.App, filePath string, key []byte, method strin
 		progressBar.SetValue(float64(i + 1))
 		time.Sleep(10 * time.Millisecond) //needed so the UI can catch up
 	}
-	
+
 	outputPath := filePath[:len(filePath)-4] // Remove .enc extension
 	err = os.WriteFile(outputPath, inputData, 0644)
 	if err != nil {

@@ -89,10 +89,12 @@ func ShowPasswordPrompt(application fyne.App, action, method string, filePath st
 			window.SetContent(paddedContent)
 		} else {
 			// For decrypt, simple form with only password
+			deleteFileAfterEncrypt = widget.NewCheck("Delete original file after encryption", nil)
+			formItems = append(formItems, widget.NewFormItem("", deleteFileAfterEncrypt))
 			form := widget.NewForm(formItems...)
 			form.OnSubmit = func() {
 				password := passwordEntry.Text
-				onPasswordEntered(password, false) // No file deletion in decryption
+				onPasswordEntered(password, deleteFileAfterEncrypt.Checked)
 				window.Close()
 			}
 

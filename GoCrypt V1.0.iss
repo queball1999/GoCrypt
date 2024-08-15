@@ -8,12 +8,12 @@ AppName=GoCrypt
 AppVersion=1.0
 DefaultDirName={autopf}\GoCrypt
 DefaultGroupName=GoCrypt
-OutputBaseFilename=GoCryptInstaller
+OutputBaseFilename=GoCrypt Installer
 Compression=lzma
 SolidCompression=yes
-
-; Including your EULA or warranty notice
-LicenseText=THIS COMES WITH NO WARRANTY. Use at your own risk.
+LicenseFile=license.txt
+AppPublisher=Queballpp1999
+AppPublisherURL=https://github.com/queball1999/GoCrypt
 
 [Files]
 ; Including the GoCrypt executable
