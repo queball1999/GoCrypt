@@ -13,11 +13,11 @@ This is a lightweight, user-friendly file encryption utility written in Go, desi
 
 ## Installation
 
-For the latest pre-built versions of the application, check the Releases[https://github.com/queball1999/GoCrypt/releases] page on the repository.
+For the latest pre-built versions of the application, check the [Releases](https://github.com/queball1999/GoCrypt/releases) page on the repository.
 
 ## Usage
 
-Once installed, simply right-click on any file or folder in Windows Explorer and select the QCrypt option from the context menu. You will be prompted to enter a password to either encrypt or decrypt the selected item.
+Once installed, simply right-click on any file or folder in Windows Explorer and select the GoCrypt option from the context menu. You will be prompted to enter a password to either encrypt or decrypt the selected item.
 
 ## Contributing
 
@@ -25,7 +25,7 @@ Contributions are welcome! Feel free to submit a pull request or open an issue i
 
 ## Compiling
 
-The installer is generated using Inno Setup[https://jrsoftware.org/isinfo.php] and the config file can be found in this repo.
+The installer is generated using [Inno Setup](https://jrsoftware.org/isinfo.php) and the config file can be found in this repo.
 
 ## License
 
