@@ -3,6 +3,8 @@
 
 [Setup]
 ; General settings
+PrivilegesRequired=admin
+ArchitecturesInstallIn64BitMode=x64
 AppId={{E4DAD780-F78A-406B-9B64-CCCE67B6C119}}
 AppName=GoCrypt
 AppVersion=1.0
@@ -11,40 +13,46 @@ DefaultGroupName=GoCrypt
 OutputBaseFilename=GoCrypt Installer
 Compression=lzma
 SolidCompression=yes
-LicenseFile=license.txt
-AppPublisher=Queballpp1999
+LicenseFile=LICENSE
+AppPublisher=Queball1999
 AppPublisherURL=https://github.com/queball1999/GoCrypt
 
 [Files]
 ; Including the GoCrypt executable
 Source: "gocrypt.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "main.go"; DestDir: "{app}"; Flags: ignoreversion
+Source: "README.md"; DestDir: "{app}"; Flags: ignoreversion
+Source: "LICENSE"; DestDir: "{app}"; Flags: ignoreversion
+
+Source: "encryption\*"; DestDir: "{app}\encryption"; Flags: recursesubdirs createallsubdirs ignoreversion
+Source: "ui\*"; DestDir: "{app}\ui"; Flags: recursesubdirs createallsubdirs ignoreversion
+Source: "images\*"; DestDir: "{app}\images"; Flags: recursesubdirs createallsubdirs ignoreversion
 
 [Icons]
 ; Creating a desktop icon for the application
-Name: "{commondesktop}\GoCrypt"; Filename: "{app}\gocrypt.exe"
+;Name: "{commondesktop}\GoCrypt"; Filename: "{app}\gocrypt.exe"
 
 [Run]
 ; Optional: Launch the application after installation
-Filename: "{app}\gocrypt.exe"; Description: "{cm:LaunchProgram,GoCrypt}"; Flags: nowait postinstall skipifsilent
+;Filename: "{app}\gocrypt.exe"; Description: "{cm:LaunchProgram,GoCrypt}"; Flags: nowait postinstall skipifsilent
 
 [Registry]
 ; Create QCrypt context menu item for all files and folders
-Root: HKCR; Subkey: "*\shell\QCrypt"; ValueType: string; ValueName: "MUIVerb"; ValueData: "QCrypt"; Flags: uninsdeletekey
-Root: HKCR; Subkey: "*\shell\QCrypt"; ValueType: string; ValueName: "SubCommands"; ValueData: "QCryptEncrypt;QCryptDecrypt"; Flags: uninsdeletekey
-Root: HKCR; Subkey: "*\shell\QCrypt"; ValueType: string; ValueName: "Icon"; ValueData: "{app}\gocrypt.exe"; Flags: uninsdeletekey
+Root: HKCR; Subkey: "*\shell\GoCrypt"; ValueType: string; ValueName: "MUIVerb"; ValueData: "GoCrypt"; Flags: uninsdeletekey createvalueifdoesntexist
+Root: HKCR; Subkey: "*\shell\GoCrypt"; ValueType: string; ValueName: "SubCommands"; ValueData: "GoCryptEncrypt;GoCryptDecrypt"; Flags: uninsdeletekey createvalueifdoesntexist
+Root: HKCR; Subkey: "*\shell\GoCrypt"; ValueType: string; ValueName: "Icon"; ValueData: "{app}\gocrypt.exe"; Flags: uninsdeletekey createvalueifdoesntexist
 
 ; Create QCrypt context menu item for directories
-Root: HKCR; Subkey: "Directory\shell\QCrypt"; ValueType: string; ValueName: "MUIVerb"; ValueData: "QCrypt"; Flags: uninsdeletekey
-Root: HKCR; Subkey: "Directory\shell\QCrypt"; ValueType: string; ValueName: "SubCommands"; ValueData: "QCryptEncrypt;QCryptDecrypt"; Flags: uninsdeletekey
-Root: HKCR; Subkey: "Directory\shell\QCrypt"; ValueType: string; ValueName: "Icon"; ValueData: "{app}\gocrypt.exe"; Flags: uninsdeletekey
+Root: HKCR; Subkey: "Directory\shell\GoCrypt"; ValueType: string; ValueName: "MUIVerb"; ValueData: "GoCrypt"; Flags: uninsdeletekey createvalueifdoesntexist
+Root: HKCR; Subkey: "Directory\shell\GoCrypt"; ValueType: string; ValueName: "SubCommands"; ValueData: "GoCryptEncrypt;GoCryptDecrypt"; Flags: uninsdeletekey createvalueifdoesntexist
+Root: HKCR; Subkey: "Directory\shell\GoCrypt"; ValueType: string; ValueName: "Icon"; ValueData: "{app}\gocrypt.exe"; Flags: uninsdeletekey createvalueifdoesntexist
 
 ; Subcommand for Encrypt
-Root: HKLM; Subkey: "SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\CommandStore\shell\QCryptEncrypt"; ValueType: string; ValueData: "Encrypt"; Flags: uninsdeletekey
-Root: HKLM; Subkey: "SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\CommandStore\shell\QCryptEncrypt"; ValueType: string; ValueName: "Icon"; ValueData: "{app}\gocrypt.exe"; Flags: uninsdeletekey
-Root: HKLM; Subkey: "SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\CommandStore\shell\QCryptEncrypt\command"; ValueType: string; ValueData: """{app}\gocrypt.exe"" -input ""%1"" -action ""encrypt"""; Flags: uninsdeletekey
+Root: HKLM; Subkey: "SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\CommandStore\shell\GoCryptEncrypt"; ValueType: string; ValueName: ""; ValueData: "Encrypt"; Flags: uninsdeletekey createvalueifdoesntexist
+Root: HKLM; Subkey: "SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\CommandStore\shell\GoCryptEncrypt"; ValueType: string; ValueName: "Icon"; ValueData: "{app}\gocrypt.exe"; Flags: uninsdeletekey createvalueifdoesntexist
+Root: HKLM; Subkey: "SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\CommandStore\shell\GoCryptEncrypt\command"; ValueType: string; ValueName: ""; ValueData: """{app}\gocrypt.exe"" -input ""%1"" -action ""encrypt"""; Flags: uninsdeletekey createvalueifdoesntexist
 
 ; Subcommand for Decrypt
-Root: HKLM; Subkey: "SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\CommandStore\shell\QCryptDecrypt"; ValueType: string; ValueData: "Decrypt"; Flags: uninsdeletekey
-Root: HKLM; Subkey: "SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\CommandStore\shell\QCryptDecrypt"; ValueType: string; ValueName: "Icon"; ValueData: "{app}\gocrypt.exe"; Flags: uninsdeletekey
-Root: HKLM; Subkey: "SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\CommandStore\shell\QCryptDecrypt\command"; ValueType: string; ValueData: """{app}\gocrypt.exe"" -input ""%1"" -action ""decrypt"""; Flags: uninsdeletekey
-
+Root: HKLM; Subkey: "SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\CommandStore\shell\GoCryptDecrypt"; ValueType: string; ValueName: ""; ValueData: "Decrypt"; Flags: uninsdeletekey createvalueifdoesntexist
+Root: HKLM; Subkey: "SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\CommandStore\shell\GoCryptDecrypt"; ValueType: string; ValueName: "Icon"; ValueData: "{app}\gocrypt.exe"; Flags: uninsdeletekey createvalueifdoesntexist
+Root: HKLM; Subkey: "SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\CommandStore\shell\GoCryptDecrypt\command"; ValueType: string; ValueName: ""; ValueData: """{app}\gocrypt.exe"" -input ""%1"" -action ""decrypt"""; Flags: uninsdeletekey createvalueifdoesntexist

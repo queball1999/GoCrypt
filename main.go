@@ -21,6 +21,7 @@ const defaultLayers = 10
 //        - The application should automatically detect file types. If the file has a .enc extension, it should only attempt decryption. For any other file type, suggest encryption.
 //		  - Optimize RAM usage
 //		  - Associate .enc files with application
+//        - Center UI elements to screen
 
 func main() {
 	// Define command-line flags
