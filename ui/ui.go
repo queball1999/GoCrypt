@@ -29,7 +29,7 @@ func ShowPasswordPrompt(application fyne.App, action, method string, filePath st
 	passwordEntry := widget.NewPasswordEntry()
 
 	label := "Enter password to " + action + " your item."
-	fileLabel := widget.NewLabelWithStyle("File: "+filePath, fyne.TextAlignLeading, fyne.TextStyle{Italic: true})
+	fileLabel := widget.NewLabelWithStyle("File(s): "+filePath, fyne.TextAlignLeading, fyne.TextStyle{Italic: true})
 
 	// Create form items
 	formItems := []*widget.FormItem{
@@ -183,4 +183,25 @@ func loadIcon() (fyne.Resource, error) {
 		return nil, fmt.Errorf("error loading icon: %v", err)
 	}
 	return fyne.NewStaticResource(filepath.Base(iconPath), data), nil
+}
+
+type ProgressWriter struct {
+	ProgressBar *widget.ProgressBar
+	TotalSize   int64
+	Written     int64
+}
+
+func (pw *ProgressWriter) Write(p []byte) (int, error) {
+	n := len(p)
+	pw.Written += int64(n)
+	pw.ProgressBar.SetValue(float64(pw.Written) / float64(pw.TotalSize))
+	return n, nil
+}
+
+func NewProgressWriter(pb *widget.ProgressBar, totalSize int64) *ProgressWriter {
+	return &ProgressWriter{
+		ProgressBar: pb,
+		TotalSize:   totalSize,
+		Written:     0,
+	}
 }

@@ -12,8 +12,6 @@ _GoCrypt_ is a CLI and GUI file encryption tool specializing in fast, convenient
 
 `--no-ui, -n` - Disable the GUI. By default _gocrypt_ will use the GUI for user interaction.
 
-`--method, -m` - Specify the encryption method. Currently supports chacha20poly1305 and aes.
-
 *IMPORTANT* - These flags MUST be passed _before_ the file arguments. Please refer to examples below.
 
 ### CLI Examples
@@ -37,6 +35,10 @@ Once installed, simply right-click on any file or folder in Windows Explorer and
 _GoCrypt_ offers a GUI for interacting with files and by default is enabled for all interactions through the CLI, context menu, or clicking directly on the desktop icon. 
 
 When launching _GoCrypt_ without any command line parameters, the user will be presented with a window allowing them to choose files for encryption.
+
+### Layers
+
+By default, _GoCrypt_ encrypts all files with 5 layers of encryption. Check out [SPEC]() for more information on the encryption/decryption algorithm.
 
 ### Installation
 
