@@ -15,8 +15,10 @@ import (
 	"fyne.io/fyne/v2/app"
 )
 
-const defaultLayers = 5
-const bufSize = 4096
+// FIXME: - Implement a failsafe to prevent the application from encrypting its own files.
+//		  - Associate .enc files with application (done through inno setup)
+//		  - Optimize RAM usage (I see consistent 80-90MB usage. Can we condense?)
+//		  - We need to change the behavior for the folder context menu and support "Compress and Encrypt", which compresses folder into .zip and encrypts the zip.
 
 func main() {
 	// Define flags
@@ -25,6 +27,9 @@ func main() {
 
 	noUI := flag.Bool("no-ui", false, "Disable the GUI")
 	flag.BoolVar(noUI, "n", false, "Disable the GUI") // Alias -n for --no-ui
+
+	layers := flag.Int("layers", 1, "Layers of encryption")
+	flag.IntVar(layers, "l", 1, "Layers of encryption") // Alias -l for --layers
 
 	// Parse the command-line flags
 	flag.Parse()
@@ -39,6 +44,12 @@ func main() {
 	command := strings.ToLower(flag.Args()[0])
 	files := flag.Args()[1:]
 
+	// Initialize the app only if necessary
+	var application fyne.App
+	if !*noUI {
+		application = app.New()
+	}
+
 	// Check if the files exist
 	var nonExistentFiles []string
 	for _, file := range files {
@@ -48,16 +59,16 @@ func main() {
 	}
 
 	if len(nonExistentFiles) > 0 {
-		handleFileNotExistError(nonExistentFiles, *noUI)
+		handleFileNotExistError(application, nonExistentFiles, *noUI)
 		return
 	}
 
 	// Determine the action based on the command
 	switch command {
 	case "encrypt", "enc", "e":
-		handleEncryption(files, *outputDir, *noUI)
+		handleEncryption(application, files, *outputDir, *noUI, *layers)
 	case "decrypt", "dec", "d":
-		handleDecryption(files, *outputDir, *noUI)
+		handleDecryption(application, files, *outputDir, *noUI)
 	default:
 		fmt.Printf("Unknown command: %s\n", command)
 		fmt.Println("Usage: GoCrypt [encrypt|decrypt] [file1 file2 ...] [flags]")
@@ -65,7 +76,7 @@ func main() {
 	}
 }
 
-func handleEncryption(files []string, outputDir string, noUI bool) {
+func handleEncryption(application fyne.App, files []string, outputDir string, noUI bool, layers int) {
 	if noUI {
 		// Handle encryption without UI
 		fmt.Printf("Encrypting %s with ChaCha20-Poly1305...\n", files)
@@ -74,18 +85,17 @@ func handleEncryption(files []string, outputDir string, noUI bool) {
 			fmt.Printf("Enter password for encryption: ")
 			var password string
 			fmt.Scanln(&password)
-			encryptFile(nil, []string{file}, []byte(password), false)
+			encryptFile(nil, []string{file}, []byte(password), layers, false)
 		}
 	} else {
 		// Handle encryption with UI
-		app := app.New()
-		ui.ShowPasswordPrompt(app, "encrypt", "chacha20poly1305", strings.Join(files, "\n"), func(password string, deleteAfter bool) {
-			encryptFile(app, files, []byte(password), deleteAfter)
+		ui.ShowPasswordPrompt(application, "encrypt", "chacha20poly1305", strings.Join(files, "\n"), func(password string, deleteAfter bool) {
+			encryptFile(application, files, []byte(password), layers, deleteAfter)
 		})
 	}
 }
 
-func handleDecryption(files []string, outputDir string, noUI bool) {
+func handleDecryption(application fyne.App, files []string, outputDir string, noUI bool) {
 	if noUI {
 		// Handle decryption without UI
 		fmt.Printf("Decrypting %s with ChaCha20-Poly1305...\n", files)
@@ -98,23 +108,22 @@ func handleDecryption(files []string, outputDir string, noUI bool) {
 		}
 	} else {
 		// Handle decryption with UI
-		app := app.New()
-		ui.ShowPasswordPrompt(app, "decrypt", "chacha20poly1305", strings.Join(files, "\n"), func(password string, deleteAfter bool) {
-			decryptFile(app, files, []byte(password), deleteAfter)
+		ui.ShowPasswordPrompt(application, "decrypt", "chacha20poly1305", strings.Join(files, "\n"), func(password string, deleteAfter bool) {
+			decryptFile(application, files, []byte(password), deleteAfter)
 		})
 	}
 }
 
-func handleFileNotExistError(files []string, noUI bool) {
+func handleFileNotExistError(application fyne.App, files []string, noUI bool) {
 	errorMessage := fmt.Sprintf("Error: The following files do not exist:\n%s", strings.Join(files, "\n"))
 	if noUI {
 		fmt.Println(errorMessage)
 	} else {
-		ui.ShowErrorDialog(errorMessage)
+		ui.ShowErrorDialog(application, errorMessage)
 	}
 }
 
-func encryptFile(application fyne.App, files []string, key []byte, deleteAfter bool) {
+func encryptFile(application fyne.App, files []string, key []byte, layers int, deleteAfter bool) {
 	var wg sync.WaitGroup
 	startTime := time.Now() // Track the time for the entire encryption process
 
@@ -137,8 +146,14 @@ func encryptFile(application fyne.App, files []string, key []byte, deleteAfter b
 			}
 			defer inputFile.Close()
 
+			// Render UI menu if no-ui is false
+			//progressBar, _ := ui.ShowProgressBar(application, "GoCrypt - Encryption Progress", defaultLayers)
+			//progressBar.SetValue(10)
+
 			outputPath := filePath + ".enc"
+			// FIXME: Handle layer input flag and passing to layered encryption.
 			err = encryption.EncryptFile(inputFile, outputPath, string(key))
+			//err = encryption.LayeredEncryptFile(inputFile, outputPath, string(key), layers)
 			if err != nil {
 				fmt.Printf("Error encrypting file: %v\n", err)
 				return
@@ -153,6 +168,9 @@ func encryptFile(application fyne.App, files []string, key []byte, deleteAfter b
 				}
 			}
 
+			
+			//progressBar.SetValue(100)
+			//win.Close()
 			fmt.Printf("File %d / %d Encrypted successfully in %s\n", index+1, len(files), time.Since(fileDuration))
 
 		}(filePath)

@@ -10,7 +10,9 @@ _GoCrypt_ is a CLI and GUI file encryption tool specializing in fast, convenient
 ### CLI Flags
 `--output, -o` - Specify the output directory. By default _gocrypt_ will place the output file in the same directory as it was pulled from.
 
-`--no-ui, -n` - Disable the GUI. By default _gocrypt_ will use the GUI for user interaction.
+`--no-ui, -n` - Disable the GUI. By default _gocrypt_ will use the GUI for all user interaction.
+
+`--layers, -l` - Define the layers of encryption. By default _gocrypt_ will use 1 layer of encryption.
 
 *IMPORTANT* - These flags MUST be passed _before_ the file arguments. Please refer to examples below.
 
@@ -25,7 +27,7 @@ _GoCrypt_ is a CLI and GUI file encryption tool specializing in fast, convenient
 ./gocrypt -n encrypt secret.txt
 ```
 ```
-./gocrypt -m chacha20poly1305 -o "C:/output.txt" encrypt secret.txt
+./gocrypt -l 5 -o "C:/output.txt" encrypt secret.txt
 ```
 
 ### GUI Usage
@@ -38,7 +40,7 @@ When launching _GoCrypt_ without any command line parameters, the user will be p
 
 ### Layers
 
-By default, _GoCrypt_ encrypts all files with 5 layers of encryption. Check out [SPEC]() for more information on the encryption/decryption algorithm.
+By default, _GoCrypt_ encrypts all files with 1 layer of encryption. Check out [SPEC]() for more information on the encryption/decryption algorithm.
 
 ### Installation
 
