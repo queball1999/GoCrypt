@@ -1,12 +1,18 @@
 package main
 
 import (
+	"archive/zip"
 	"flag"
 	"fmt"
 	"os"
+	"io"
 	"strings"
 	"sync"
 	"time"
+	"path/filepath"
+
+	"golang.org/x/term"
+	"syscall"
 
 	"GoCrypt/encryption"
 	"GoCrypt/ui"
@@ -15,10 +21,9 @@ import (
 	"fyne.io/fyne/v2/app"
 )
 
-// FIXME: - Implement a failsafe to prevent the application from encrypting its own files.
-//		  - Associate .enc files with application (done through inno setup)
+// FIXME: - Associate .enc files with application (done through inno setup)
 //		  - Optimize RAM usage (I see consistent 80-90MB usage. Can we condense?)
-//		  - We need to change the behavior for the folder context menu and support "Compress and Encrypt", which compresses folder into .zip and encrypts the zip.
+//		  - Need to modify the user to explicitely state wether they are encrypting files or folders
 
 func main() {
 	// Define flags
@@ -79,14 +84,16 @@ func main() {
 func handleEncryption(application fyne.App, files []string, outputDir string, noUI bool, layers int) {
 	if noUI {
 		// Handle encryption without UI
-		fmt.Printf("Encrypting %s with ChaCha20-Poly1305...\n", files)
-		// Implement encryption logic here
-		for _, file := range files {
-			fmt.Printf("Enter password for encryption: ")
-			var password string
-			fmt.Scanln(&password)
-			encryptFile(nil, []string{file}, []byte(password), layers, false)
+		fmt.Printf("Enter password for encryption: ")
+		passwordBytes, err := term.ReadPassword(int(syscall.Stdin))
+		fmt.Println() // For a newline after password input
+		if err != nil {
+			fmt.Printf("Error reading password: %v\n", err)
+			return
 		}
+		password := string(passwordBytes)
+		encryptFile(nil, files, []byte(password), layers, false)
+
 	} else {
 		// Handle encryption with UI
 		ui.ShowPasswordPrompt(application, "encrypt", "chacha20poly1305", strings.Join(files, "\n"), func(password string, deleteAfter bool) {
@@ -98,14 +105,16 @@ func handleEncryption(application fyne.App, files []string, outputDir string, no
 func handleDecryption(application fyne.App, files []string, outputDir string, noUI bool) {
 	if noUI {
 		// Handle decryption without UI
-		fmt.Printf("Decrypting %s with ChaCha20-Poly1305...\n", files)
-		// Implement decryption logic here
-		for _, file := range files {
-			fmt.Printf("Enter password for decryption: ")
-			var password string
-			fmt.Scanln(&password)
-			decryptFile(nil, []string{file}, []byte(password), false)
+		fmt.Printf("Enter password for decryption: ")
+		passwordBytes, err := term.ReadPassword(int(syscall.Stdin))
+		fmt.Println() // For a newline after password input
+		if err != nil {
+			fmt.Printf("Error reading password: %v\n", err)
+			return
 		}
+		password := string(passwordBytes)
+		decryptFile(nil, files, []byte(password), false)
+
 	} else {
 		// Handle decryption with UI
 		ui.ShowPasswordPrompt(application, "decrypt", "chacha20poly1305", strings.Join(files, "\n"), func(password string, deleteAfter bool) {
@@ -132,11 +141,30 @@ func encryptFile(application fyne.App, files []string, key []byte, layers int, d
 		go func(filePath string) {
 			defer wg.Done()
 			fileDuration := time.Now()
+			isDir := false	// bool to track if driectory
 
 			// Check if the file is already encrypted
 			if strings.HasSuffix(filePath, ".enc") {
 				fmt.Printf("File %s is already encrypted. Skipping...\n", filePath)
 				return
+			}
+
+			// Implement failsafe
+			if isFileProtected(filePath) {
+				fmt.Printf("Skipping protected file or directory: %s\n", filePath)
+				return
+			}
+
+			// If it's a directory, compress it first
+			if isDirectory(filePath) {
+				isDir = true
+				zipPath := filePath + ".zip"
+				err := compressFolder(filePath, zipPath)
+				if err != nil {
+					fmt.Printf("Error compressing folder: %v\n", err)
+					return
+				}
+				filePath = zipPath
 			}
 
 			inputFile, err := os.Open(filePath)
@@ -159,15 +187,12 @@ func encryptFile(application fyne.App, files []string, key []byte, layers int, d
 				return
 			}
 
-			if deleteAfter {
-				err := os.Remove(filePath)
+			if deleteAfter || isDir {
+				err := deleteFile(filePath)
 				if err != nil {
-					fmt.Printf("Failed to delete the original file: %v\n", err)
-				} else {
-					fmt.Printf("Original file %s deleted successfully\n", filePath)
+					fmt.Printf("%v\n", err)
 				}
 			}
-
 			
 			//progressBar.SetValue(100)
 			//win.Close()
@@ -218,11 +243,9 @@ func decryptFile(application fyne.App, files []string, key []byte, deleteAfter b
 			}
 
 			if deleteAfter {
-				err := os.Remove(filePath)
+				err := deleteFile(filePath)
 				if err != nil {
-					fmt.Printf("Failed to delete the original file: %v\n", err)
-				} else {
-					fmt.Printf("Original file %s deleted successfully\n", filePath)
+					fmt.Printf("%v\n", err)
 				}
 			}
 
@@ -232,4 +255,77 @@ func decryptFile(application fyne.App, files []string, key []byte, deleteAfter b
 
 	wg.Wait()
 	fmt.Printf("All files decrypted in: %s\n", time.Since(startTime))
+}
+
+func deleteFile(filePath string) error {
+	err := os.Remove(filePath)
+	if err != nil {
+		return fmt.Errorf("failed to delete the original file: %v", err)
+	} 
+	fmt.Printf("Original file %s deleted successfully\n", filePath)
+	return nil
+}
+
+// isFileProtected checks if the file should be skipped from encryption (e.g., GoCrypt files)
+func isFileProtected(filePath string) bool {
+	// Get the current working directory
+	currentDir, err := os.Getwd()
+	if err != nil {
+		fmt.Printf("Error getting current directory: %v\n", err)
+		return false
+	}
+
+	// Check if the file is within any GoCrypt-related directory or is GoCrypt executable
+	if strings.Contains(filePath, "GoCrypt") || strings.Contains(filePath, "gocrypt.exe") || strings.HasPrefix(filePath, currentDir) {
+		return true
+	}
+	return false
+}
+
+// isDirectory checks if the given path is a directory
+func isDirectory(path string) bool {
+	info, err := os.Stat(path)
+	if err != nil {
+		return false
+	}
+	return info.IsDir()
+}
+
+// compressFolder compresses a folder into a .zip file
+func compressFolder(folderPath, zipPath string) error {
+	zipFile, err := os.Create(zipPath)
+	if err != nil {
+		return fmt.Errorf("failed to create zip file: %v", err)
+	}
+	defer zipFile.Close()
+
+	archive := zip.NewWriter(zipFile)
+	defer archive.Close()
+
+	err = filepath.Walk(folderPath, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		relativePath := strings.TrimPrefix(path, folderPath)
+		if info.IsDir() {
+			return nil
+		}
+
+		file, err := os.Open(path)
+		if err != nil {
+			return err
+		}
+		defer file.Close()
+
+		writer, err := archive.Create(relativePath)
+		if err != nil {
+			return err
+		}
+
+		_, err = io.Copy(writer, file)
+		return err
+	})
+
+	return err
 }

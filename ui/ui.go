@@ -59,11 +59,11 @@ func ShowPasswordPrompt(application fyne.App, action, method, filePath string, o
 	if action == "encrypt" {
 		confirmPasswordEntry := widget.NewPasswordEntry()
 		formItems = append(formItems, widget.NewFormItem("Confirm", confirmPasswordEntry))
-
-		deleteFileAfterEncrypt = widget.NewCheck("Delete original file after encryption", nil)
-		formItems = append(formItems, widget.NewFormItem("", deleteFileAfterEncrypt))
 	}
 
+	deleteFileAfterEncrypt = widget.NewCheck("Delete original file after encryption", nil)
+	formItems = append(formItems, widget.NewFormItem("", deleteFileAfterEncrypt))
+	
 	form := widget.NewForm(formItems...)
 	form.OnSubmit = func() {
 		password := passwordEntry.Text
