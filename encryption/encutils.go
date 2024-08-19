@@ -19,3 +19,12 @@ func GenerateSalt() ([]byte, error) {
 func DeriveKey(password string, salt []byte) []byte {
     return pbkdf2.Key([]byte(password), salt, 4096, 32, sha256.New)
 }
+
+func incrementNonce(nonce []byte) {
+    for i := len(nonce) - 1; i >= 0; i-- {
+        nonce[i]++
+        if nonce[i] != 0 {
+            break
+        }
+    }
+}

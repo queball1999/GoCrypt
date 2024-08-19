@@ -1,101 +1,162 @@
 package encryption
 
 import (
-	"crypto/aes"
-	"crypto/cipher"
 	"fmt"
 	"io"
 	"os"
-	"golang.org/x/crypto/blake2b"
+
+	"golang.org/x/crypto/chacha20poly1305"
 )
 
-// DecryptFile decrypts the encrypted file at the given path and writes the decrypted data to the output path.
+// DecryptFile decrypts the file at the given path and writes the decrypted data to the output path using ChaCha20-Poly1305.
 func DecryptFile(source *os.File, pathOut, password string) error {
-	fileInfo, err := source.Stat()
+	logFile, err := os.Create("decryption.log")
 	if err != nil {
-		return fmt.Errorf("failed to get file info: %v", err)
+		return fmt.Errorf("failed to create log file: %v", err)
 	}
-	fmt.Printf("Decrypting file of size: %d bytes\n", fileInfo.Size())
+	defer logFile.Close()
 
-	// Read the salt, nonce, and MAC from the file header
-	header := make([]byte, 64) // 16 bytes for salt, 16 for nonce, 32 for MAC
-	if _, err := io.ReadFull(source, header); err != nil {
-		return fmt.Errorf("failed to read header: %v", err)
+	// Read the nonce from the beginning of the file
+	nonce := make([]byte, 24) // 24 bytes nonce
+	if _, err := io.ReadFull(source, nonce); err != nil {
+		return fmt.Errorf("failed to read nonce: %v", err)
 	}
-	salt := header[:16]
-	nonce := header[16:32]
-	fileTag := header[32:64]
-
-	fmt.Printf("Salt: %x\n", salt)
 	fmt.Printf("Nonce: %x\n", nonce)
-	fmt.Printf("Stored MAC: %x\n", fileTag)
 
-	// Derive the decryption key using the password and salt
+	// Read the salt from the file
+	salt := make([]byte, 16) // 16 bytes salt
+	if _, err := io.ReadFull(source, salt); err != nil {
+		return fmt.Errorf("failed to read salt: %v", err)
+	}
+	fmt.Printf("Salt: %x\n", salt)
+
+	// Derive the decryption key using the password and the salt
 	key := DeriveKey(password, salt)
-	fmt.Printf("KEY: %x\n", key)
+	fmt.Printf("Key: %x\n", key)
 
-	// Ensure key length is 32 bytes
-	if len(key) != 32 {
-		return fmt.Errorf("error: %v", "derived key length is not 32 bytes")
-	}
-
-	block, err := aes.NewCipher(key)
+	aead, err := chacha20poly1305.NewX(key)
 	if err != nil {
-		return fmt.Errorf("failed to create AES cipher: %v", err)
+		return fmt.Errorf("failed to create AEAD: %v", err)
 	}
 
-	stream := cipher.NewCTR(block, nonce)
-	blake, err := blake2b.New256(nil)
-	if err != nil {
-		return fmt.Errorf("failed to create Blake2b hash: %v", err)
-	}
-
-	// Prepare output file
 	tmpFile, err := os.CreateTemp("", "*.tmp")
 	if err != nil {
-		return fmt.Errorf("failed to create temp file: %v", err)
+		return err
 	}
 	defer os.Remove(tmpFile.Name())
 
-	// Decrypt the file data and compute the MAC
-	buffer := make([]byte, 32*1024) // 32KB buffer
-	for {
-		n, err := source.Read(buffer)
-		if n > 0 {
-			// Decrypt the buffer
-			stream.XORKeyStream(buffer[:n], buffer[:n])
+	// Adjust the buffer size to account for the MAC overhead
+	encryptedBuffer := make([]byte, 32*1024+16) // Buffer to hold ciphertext
+	plaintextBuffer := make([]byte, 32*1024)    // Buffer for decrypted plaintext
 
-			// Write to temp file and update the MAC
-			if _, err := tmpFile.Write(buffer[:n]); err != nil {
-				return fmt.Errorf("failed to write to temp file: %v", err)
+	for {
+		n, err := source.Read(encryptedBuffer)
+		if n > 0 {
+			// Decrypt the buffer chunk
+			plaintext, err := aead.Open(plaintextBuffer[:0], nonce, encryptedBuffer[:n], nil)
+			if err != nil {
+				return fmt.Errorf("decryption failed: %v", err)
 			}
-			blake.Write(buffer[:n])
+			if _, err := tmpFile.Write(plaintext); err != nil {
+				return fmt.Errorf("failed to write decrypted data: %v", err)
+			}
 		}
 		if err == io.EOF {
 			break
 		}
 		if err != nil {
-			return fmt.Errorf("failed to read from source file: %v", err)
+			return err
 		}
 	}
 
-	// Calculate the expected MAC
-	expectedTag := blake.Sum(nil)
-	fmt.Printf("Computed MAC: %x\n", expectedTag)
-
-	// Compare the computed MAC with the stored MAC
-    /*
-	if !bytes.Equal(expectedTag, fileTag) {
-		return fmt.Errorf("MAC mismatch: decryption failed or file corrupted")
-	}
-    */
-
-	// Finalize the temp file
 	tmpFile.Close()
 	if err := os.Rename(tmpFile.Name(), pathOut); err != nil {
-		return fmt.Errorf("failed to rename temp file: %v", err)
+		return err
 	}
 
-	fmt.Printf("Decryption successful: %s\n", pathOut)
+	return nil
+}
+
+// LayeredDecryptFile decrypts the file with multiple layers using ChaCha20-Poly1305.
+// FIXME: Need to fix layered issues. Reaching EOF after first layer.
+func LayeredDecryptFile(source *os.File, pathOut, password string, layers int) error {
+	// Temporary files for layers
+	var currentSource *os.File = source
+
+	for layer := 0; layer < layers; layer++ {
+		fmt.Printf("Starting layer %d decryption...\n", layer+1)
+
+        // Read the nonce from the beginning of the file
+		nonce := make([]byte, 24) // 24 bytes nonce
+		if _, err := io.ReadFull(currentSource, nonce); err != nil {
+			return fmt.Errorf("failed to read nonce: %v", err)
+		}
+		fmt.Printf("Nonce: %x\n", nonce)
+
+		// Read the salt from the file
+		salt := make([]byte, 16) // 16 bytes salt
+		if _, err := io.ReadFull(currentSource, salt); err != nil {
+			return fmt.Errorf("failed to read salt: %v", err)
+		}
+		fmt.Printf("Salt: %x\n", salt)
+
+		// Derive the decryption key using the password and the salt
+		key := DeriveKey(password, salt)
+		fmt.Printf("Key: %x\n", key)
+
+		aead, err := chacha20poly1305.NewX(key)
+		if err != nil {
+			return fmt.Errorf("failed to create AEAD: %v", err)
+		}
+
+		// Create a temporary file for this layer's output
+		tmpFile, err := os.CreateTemp("", "*.tmp")
+		if err != nil {
+			return err
+		}
+		defer os.Remove(tmpFile.Name())
+
+		// Adjust the buffer size to account for the MAC overhead
+		encryptedBuffer := make([]byte, 32*1024+16) // Buffer to hold ciphertext
+		plaintextBuffer := make([]byte, 32*1024)    // Buffer for decrypted plaintext
+		
+		for {
+			n, err := currentSource.Read(encryptedBuffer)
+			if n > 0 {
+				// Decrypt the buffer chunk
+				plaintext, err := aead.Open(plaintextBuffer[:0], nonce, encryptedBuffer[:n], nil)
+				if err != nil {
+					return fmt.Errorf("layer %d decryption failed: %v", layer+1, err)
+				}
+				if _, err := tmpFile.Write(plaintext); err != nil {
+					return fmt.Errorf("failed to write decrypted data: %v", err)
+				}
+			}
+			if err == io.EOF {
+				break
+			}
+			if err != nil {
+				return err
+			}
+		}
+
+		tmpFile.Close()
+
+		// Close the previous source file and set the current source to the new temp file
+		if currentSource != source {
+			currentSource.Close()
+		}
+		currentSource, err = os.Open(tmpFile.Name())
+		if err != nil {
+			return err
+		}
+	}
+
+	currentSource.Close()
+	// Rename the final temp file to the output path
+	if err := os.Rename(currentSource.Name(), pathOut); err != nil {
+		return err
+	}
+
 	return nil
 }

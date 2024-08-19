@@ -1,21 +1,19 @@
 package main
 
 import (
-	"archive/zip"
 	"flag"
 	"fmt"
 	"os"
-	"io"
 	"strings"
 	"sync"
 	"time"
-	"path/filepath"
 
 	"golang.org/x/term"
 	"syscall"
 
 	"GoCrypt/encryption"
 	"GoCrypt/ui"
+	"GoCrypt/fileutils"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
@@ -24,6 +22,7 @@ import (
 // FIXME: - Associate .enc files with application (done through inno setup)
 //		  - Optimize RAM usage (I see consistent 80-90MB usage. Can we condense?)
 //		  - Need to modify the user to explicitely state wether they are encrypting files or folders
+//		  - Layered encryption should be a while loop that detects layers. maybe we need layer count in header?
 
 func main() {
 	// Define flags
@@ -33,8 +32,8 @@ func main() {
 	noUI := flag.Bool("no-ui", false, "Disable the GUI")
 	flag.BoolVar(noUI, "n", false, "Disable the GUI") // Alias -n for --no-ui
 
-	layers := flag.Int("layers", 1, "Layers of encryption")
-	flag.IntVar(layers, "l", 1, "Layers of encryption") // Alias -l for --layers
+	layers := flag.Int("layers", 5, "Layers of encryption")
+	flag.IntVar(layers, "l", 5, "Layers of encryption") // Alias -l for --layers
 
 	// Parse the command-line flags
 	flag.Parse()
@@ -73,7 +72,7 @@ func main() {
 	case "encrypt", "enc", "e":
 		handleEncryption(application, files, *outputDir, *noUI, *layers)
 	case "decrypt", "dec", "d":
-		handleDecryption(application, files, *outputDir, *noUI)
+		handleDecryption(application, files, *outputDir, *noUI, *layers)
 	default:
 		fmt.Printf("Unknown command: %s\n", command)
 		fmt.Println("Usage: GoCrypt [encrypt|decrypt] [file1 file2 ...] [flags]")
@@ -102,7 +101,7 @@ func handleEncryption(application fyne.App, files []string, outputDir string, no
 	}
 }
 
-func handleDecryption(application fyne.App, files []string, outputDir string, noUI bool) {
+func handleDecryption(application fyne.App, files []string, outputDir string, noUI bool, layers int) {
 	if noUI {
 		// Handle decryption without UI
 		fmt.Printf("Enter password for decryption: ")
@@ -113,12 +112,12 @@ func handleDecryption(application fyne.App, files []string, outputDir string, no
 			return
 		}
 		password := string(passwordBytes)
-		decryptFile(nil, files, []byte(password), false)
+		decryptFile(nil, files, []byte(password), layers, false)
 
 	} else {
 		// Handle decryption with UI
 		ui.ShowPasswordPrompt(application, "decrypt", "chacha20poly1305", strings.Join(files, "\n"), func(password string, deleteAfter bool) {
-			decryptFile(application, files, []byte(password), deleteAfter)
+			decryptFile(application, files, []byte(password), layers, deleteAfter)
 		})
 	}
 }
@@ -150,16 +149,16 @@ func encryptFile(application fyne.App, files []string, key []byte, layers int, d
 			}
 
 			// Implement failsafe
-			if isFileProtected(filePath) {
+			if fileutils.IsFileProtected(filePath) {
 				fmt.Printf("Skipping protected file or directory: %s\n", filePath)
 				return
 			}
 
 			// If it's a directory, compress it first
-			if isDirectory(filePath) {
+			if fileutils.IsDirectory(filePath) {
 				isDir = true
 				zipPath := filePath + ".zip"
-				err := compressFolder(filePath, zipPath)
+				err := fileutils.CompressFolder(filePath, zipPath)
 				if err != nil {
 					fmt.Printf("Error compressing folder: %v\n", err)
 					return
@@ -179,7 +178,7 @@ func encryptFile(application fyne.App, files []string, key []byte, layers int, d
 			//progressBar.SetValue(10)
 
 			outputPath := filePath + ".enc"
-			// FIXME: Handle layer input flag and passing to layered encryption.
+			
 			err = encryption.EncryptFile(inputFile, outputPath, string(key))
 			//err = encryption.LayeredEncryptFile(inputFile, outputPath, string(key), layers)
 			if err != nil {
@@ -188,7 +187,7 @@ func encryptFile(application fyne.App, files []string, key []byte, layers int, d
 			}
 
 			if deleteAfter || isDir {
-				err := deleteFile(filePath)
+				err := fileutils.DeleteFile(filePath)
 				if err != nil {
 					fmt.Printf("%v\n", err)
 				}
@@ -205,7 +204,7 @@ func encryptFile(application fyne.App, files []string, key []byte, layers int, d
 	fmt.Printf("All files encrypted in: %s\n", time.Since(startTime))
 }
 
-func decryptFile(application fyne.App, files []string, key []byte, deleteAfter bool) {
+func decryptFile(application fyne.App, files []string, key []byte, layers int, deleteAfter bool) {
 	var wg sync.WaitGroup
 	startTime := time.Now() // Track the time for the entire decryption process
 
@@ -228,6 +227,8 @@ func decryptFile(application fyne.App, files []string, key []byte, deleteAfter b
 			defer inputFile.Close()
 
 			outputPath := filePath[:len(filePath)-4] // Remove .enc extension
+
+			//err = encryption.LayeredDecryptFile(inputFile, outputPath, string(key), layers)
 			err = encryption.DecryptFile(inputFile, outputPath, string(key))
 			if err != nil {
 				fmt.Printf("Decryption failed: %v\n", err)
@@ -243,7 +244,7 @@ func decryptFile(application fyne.App, files []string, key []byte, deleteAfter b
 			}
 
 			if deleteAfter {
-				err := deleteFile(filePath)
+				err := fileutils.DeleteFile(filePath)
 				if err != nil {
 					fmt.Printf("%v\n", err)
 				}
@@ -255,77 +256,4 @@ func decryptFile(application fyne.App, files []string, key []byte, deleteAfter b
 
 	wg.Wait()
 	fmt.Printf("All files decrypted in: %s\n", time.Since(startTime))
-}
-
-func deleteFile(filePath string) error {
-	err := os.Remove(filePath)
-	if err != nil {
-		return fmt.Errorf("failed to delete the original file: %v", err)
-	} 
-	fmt.Printf("Original file %s deleted successfully\n", filePath)
-	return nil
-}
-
-// isFileProtected checks if the file should be skipped from encryption (e.g., GoCrypt files)
-func isFileProtected(filePath string) bool {
-	// Get the current working directory
-	currentDir, err := os.Getwd()
-	if err != nil {
-		fmt.Printf("Error getting current directory: %v\n", err)
-		return false
-	}
-
-	// Check if the file is within any GoCrypt-related directory or is GoCrypt executable
-	if strings.Contains(filePath, "GoCrypt") || strings.Contains(filePath, "gocrypt.exe") || strings.HasPrefix(filePath, currentDir) {
-		return true
-	}
-	return false
-}
-
-// isDirectory checks if the given path is a directory
-func isDirectory(path string) bool {
-	info, err := os.Stat(path)
-	if err != nil {
-		return false
-	}
-	return info.IsDir()
-}
-
-// compressFolder compresses a folder into a .zip file
-func compressFolder(folderPath, zipPath string) error {
-	zipFile, err := os.Create(zipPath)
-	if err != nil {
-		return fmt.Errorf("failed to create zip file: %v", err)
-	}
-	defer zipFile.Close()
-
-	archive := zip.NewWriter(zipFile)
-	defer archive.Close()
-
-	err = filepath.Walk(folderPath, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-
-		relativePath := strings.TrimPrefix(path, folderPath)
-		if info.IsDir() {
-			return nil
-		}
-
-		file, err := os.Open(path)
-		if err != nil {
-			return err
-		}
-		defer file.Close()
-
-		writer, err := archive.Create(relativePath)
-		if err != nil {
-			return err
-		}
-
-		_, err = io.Copy(writer, file)
-		return err
-	})
-
-	return err
 }

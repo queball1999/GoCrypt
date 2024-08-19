@@ -1,23 +1,21 @@
 package encryption
 
 import (
-	"crypto/aes"
-	"crypto/cipher"
 	"crypto/rand"
 	"fmt"
 	"io"
 	"os"
 
-	"golang.org/x/crypto/blake2b"
+	"golang.org/x/crypto/chacha20poly1305"
 )
 
-// EncryptFile encrypts the file at the given path and writes the encrypted data to the output path.
+// EncryptFile encrypts the file at the given path and writes the encrypted data to the output path using ChaCha20-Poly1305.
 func EncryptFile(source *os.File, pathOut, password string) error {
-	fileInfo, err := source.Stat()
+	logFile, err := os.Create("encryption.log")
 	if err != nil {
-		return fmt.Errorf("failed to get file info: %v", err)
+		return fmt.Errorf("failed to create log file: %v", err)
 	}
-	fmt.Printf("Encrypting file of size: %d bytes\n", fileInfo.Size())
+	defer logFile.Close()
 
 	// Generate a unique salt for each file
 	salt, err := GenerateSalt()
@@ -26,55 +24,49 @@ func EncryptFile(source *os.File, pathOut, password string) error {
 	}
 	fmt.Printf("Salt: %x\n", salt)
 
-	// Derive the encryption key using the password and unique salt
+	// Derive the encryption key using the password (ensure it's 32 bytes)
 	key := DeriveKey(password, salt)
-	fmt.Printf("KEY: %x\n", key)
+	fmt.Printf("Key: %x\n", key)
 
-	// Ensure key length is 32 bytes
-	if len(key) != 32 {
-		fmt.Println("Error: Derived key length is not 32 bytes")
-		return nil
+	aead, err := chacha20poly1305.NewX(key)
+	if err != nil {
+		return fmt.Errorf("failed to create AEAD: %v", err)
 	}
 
-	block, err := aes.NewCipher(key)
-	if err != nil {
-		return err
-	}
-
-	nonce := generateNonce(block.BlockSize())
-	stream := cipher.NewCTR(block, nonce)
-	blake, err := blake2b.New256(nil)
-	if err != nil {
-		return err
+	// Generate a nonce
+	nonce := make([]byte, 24) // 24 bytes nonce
+	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
+		return fmt.Errorf("failed to generate nonce: %v", err)
 	}
 	fmt.Printf("Nonce: %x\n", nonce)
 
+	// Create temp file
 	tmpFile, err := os.CreateTemp("", "*.tmp")
 	if err != nil {
 		return err
 	}
 	defer os.Remove(tmpFile.Name())
 
-	// Write the salt and nonce to the header (reserve space for MAC)
-	header := make([]byte, 64)
-	copy(header[:16], salt)
-	copy(header[16:32], nonce)
-	if _, err := tmpFile.Write(header); err != nil {
-		return err
+	// Write the nonce and salt to the output file
+	if _, err := tmpFile.Write(nonce); err != nil {
+		return fmt.Errorf("failed to write nonce: %v", err)
+	}
+	if _, err := tmpFile.Write(salt); err != nil {
+		return fmt.Errorf("failed to write salt: %v", err)
 	}
 
-	buffer := make([]byte, 32*1024) // 32KB buffer
+	// Adjust the buffer size to account for the MAC overhead
+	buffer := make([]byte, 32*1024)                 // 32KB buffer for reading plaintext
+	encryptedBuffer := make([]byte, 32*1024+16) // Buffer to hold ciphertext (plaintext + 16 bytes MAC)
+
 	for {
 		n, err := source.Read(buffer)
 		if n > 0 {
-			// Encrypt the buffer
-			stream.XORKeyStream(buffer[:n], buffer[:n])
-
-			// Write to temp file and update the MAC
-			if _, err := tmpFile.Write(buffer[:n]); err != nil {
-				return err
+			// Encrypt the buffer chunk
+			ciphertext := aead.Seal(encryptedBuffer[:0], nonce, buffer[:n], nil)
+			if _, err := tmpFile.Write(ciphertext); err != nil {
+				return fmt.Errorf("failed to write encrypted data: %v", err)
 			}
-			blake.Write(buffer[:n])
 		}
 		if err == io.EOF {
 			break
@@ -82,18 +74,6 @@ func EncryptFile(source *os.File, pathOut, password string) error {
 		if err != nil {
 			return err
 		}
-	}
-
-	// Calculate the MAC
-	mac := blake.Sum(nil)
-	fmt.Printf("BLAKE TAG: %x\n", mac)
-
-	// Write the MAC into the reserved header space
-	if _, err := tmpFile.Seek(32, io.SeekStart); err != nil {
-		return err
-	}
-	if _, err := tmpFile.Write(mac); err != nil {
-		return err
 	}
 
 	tmpFile.Close()
@@ -104,74 +84,64 @@ func EncryptFile(source *os.File, pathOut, password string) error {
 	return nil
 }
 
+// LayeredEncryptFile encrypts the file with multiple layers using ChaCha20-Poly1305.
+// FIXME: Need to fix layered issues. Reaching EOF after first layer.
 func LayeredEncryptFile(source *os.File, pathOut, password string, layers int) error {
-	fileInfo, err := source.Stat()
-	if err != nil {
-		return fmt.Errorf("failed to get file info: %v", err)
-	}
-	fmt.Printf("Encrypting file of size: %d bytes\n", fileInfo.Size())
-
-	// Generate the initial salt and key
-	salt, err := GenerateSalt()
-	if err != nil {
-		return err
-	}
-	fmt.Printf("Initial Salt: %x\n", salt)
-	key := DeriveKey(password, salt)
-
-	// Ensure key length is 32 bytes
-	if len(key) != 32 {
-		fmt.Println("Error: Derived key length is not 32 bytes")
-		return nil
-	}
-
 	// Temporary files for layers
 	var currentSource *os.File = source
 
 	for layer := 0; layer < layers; layer++ {
 		fmt.Printf("Starting layer %d encryption...\n", layer+1)
 
-		// Create a temporary file for this layer's output
+        // Generate a unique salt for each file
+		salt, err := GenerateSalt()
+		if err != nil {
+			return err
+		}
+		fmt.Printf("Salt: %x\n", salt)
+
+		// Derive the encryption key using the password (ensure it's 32 bytes)
+		key := DeriveKey(password, salt)
+		fmt.Printf("Key: %x\n", key)
+
+		aead, err := chacha20poly1305.NewX(key)
+		if err != nil {
+			return fmt.Errorf("failed to create AEAD: %v", err)
+		}
+
+		// Generate a nonce
+		nonce := make([]byte, 24) // 24 bytes nonce
+		if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
+			return fmt.Errorf("failed to generate nonce: %v", err)
+		}
+		fmt.Printf("Nonce: %x\n", nonce)
+
+		// Create temp file
 		tmpFile, err := os.CreateTemp("", "*.tmp")
 		if err != nil {
 			return err
 		}
 		defer os.Remove(tmpFile.Name())
 
-		// Generate nonce for this layer
-		block, err := aes.NewCipher(key)
-		if err != nil {
-			return err
+		// Write the nonce and salt to the output file
+		if _, err := tmpFile.Write(nonce); err != nil {
+			return fmt.Errorf("failed to write nonce: %v", err)
 		}
-		nonce := generateNonce(block.BlockSize())
-		stream := cipher.NewCTR(block, nonce)
-		blake, err := blake2b.New256(nil)
-		if err != nil {
-			return err
-		}
-		fmt.Printf("Layer %d Nonce: %x\n", layer+1, nonce)
-
-		// Write the salt and nonce to the header (reserve space for MAC)
-		header := make([]byte, 64)
-		copy(header[:16], salt)
-		copy(header[16:32], nonce)
-		if _, err := tmpFile.Write(header); err != nil {
-			return err
+		if _, err := tmpFile.Write(salt); err != nil {
+			return fmt.Errorf("failed to write salt: %v", err)
 		}
 
-		// Process the file in chunks
-		buffer := make([]byte, 32*1024) // 32KB buffer
+		buffer := make([]byte, 32*1024)                 // 32KB buffer for reading plaintext
+		encryptedBuffer := make([]byte, 32*1024+16) // Buffer to hold ciphertext (plaintext + 16 bytes MAC)
+		
 		for {
-			n, err := currentSource.Read(buffer)
+			n, err := source.Read(buffer)
 			if n > 0 {
-				// Encrypt the buffer
-				stream.XORKeyStream(buffer[:n], buffer[:n])
-
-				// Write to temp file and update the MAC
-				if _, err := tmpFile.Write(buffer[:n]); err != nil {
-					return err
+				// Encrypt the buffer chunk
+				ciphertext := aead.Seal(encryptedBuffer[:0], nonce, buffer[:n], nil)
+				if _, err := tmpFile.Write(ciphertext); err != nil {
+					return fmt.Errorf("failed to write encrypted data: %v", err)
 				}
-				blake.Write(buffer[:n])
 			}
 			if err == io.EOF {
 				break
@@ -179,18 +149,6 @@ func LayeredEncryptFile(source *os.File, pathOut, password string, layers int) e
 			if err != nil {
 				return err
 			}
-		}
-
-		// Calculate the MAC for this layer
-		mac := blake.Sum(nil)
-		fmt.Printf("Layer %d MAC: %x\n", layer+1, mac)
-
-		// Write the MAC into the reserved header space
-		if _, err := tmpFile.Seek(32, io.SeekStart); err != nil {
-			return err
-		}
-		if _, err := tmpFile.Write(mac); err != nil {
-			return err
 		}
 
 		tmpFile.Close()
@@ -203,30 +161,13 @@ func LayeredEncryptFile(source *os.File, pathOut, password string, layers int) e
 		if err != nil {
 			return err
 		}
-
-		// Update the salt and key for the next layer
-		salt, err = GenerateSalt()
-		if err != nil {
-			return err
-		}
-		key = DeriveKey(password, salt)
 	}
-	
+
 	currentSource.Close()
 	// Rename the final temp file to the output path
 	if err := os.Rename(currentSource.Name(), pathOut); err != nil {
 		return err
 	}
-	
 
 	return nil
-}
-
-// generateNonce generates a nonce for AES-CTR.
-func generateNonce(size int) []byte {
-	nonce := make([]byte, size)
-	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
-		panic(err) // In production, handle this properly
-	}
-	return nonce
 }
