@@ -179,8 +179,8 @@ func encryptFile(application fyne.App, files []string, key []byte, layers int, d
 
 			outputPath := filePath + ".enc"
 			
-			err = encryption.EncryptFile(inputFile, outputPath, string(key))
-			//err = encryption.LayeredEncryptFile(inputFile, outputPath, string(key), layers)
+			//err = encryption.EncryptFile(inputFile, outputPath, string(key))
+			err = encryption.LayeredEncryptFile(inputFile, outputPath, string(key), layers)
 			if err != nil {
 				fmt.Printf("Error encrypting file: %v\n", err)
 				return
@@ -228,8 +228,8 @@ func decryptFile(application fyne.App, files []string, key []byte, layers int, d
 
 			outputPath := filePath[:len(filePath)-4] // Remove .enc extension
 
-			//err = encryption.LayeredDecryptFile(inputFile, outputPath, string(key), layers)
-			err = encryption.DecryptFile(inputFile, outputPath, string(key))
+			err = encryption.LayeredDecryptFile(inputFile, outputPath, string(key), layers)
+			//err = encryption.DecryptFile(inputFile, outputPath, string(key))
 			if err != nil {
 				fmt.Printf("Decryption failed: %v\n", err)
 				/*
