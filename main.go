@@ -8,12 +8,13 @@ import (
 	"sync"
 	"time"
 
-	"golang.org/x/term"
 	"syscall"
 
+	"golang.org/x/term"
+
 	"GoCrypt/encryption"
-	"GoCrypt/ui"
 	"GoCrypt/fileutils"
+	"GoCrypt/ui"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
@@ -21,7 +22,8 @@ import (
 
 // FIXME: - Associate .enc files with application (done through inno setup)
 //		  - Optimize RAM usage (I see consistent 80-90MB usage. Can we condense?)
-//		  - Need to add MAX layer count of 256
+//		  - When encrypting folders, we need to also remove temporary zip file
+//		  - WE need to detect encryption/decryption option in GUI. If already encrypted we should only show decryption option.
 
 func main() {
 	// Define flags
@@ -44,7 +46,7 @@ func main() {
 	}
 
 	// limit to 200 layers
-	if (*layers > 200) {
+	if *layers > 200 {
 		fmt.Println("Error: Maximum allowed encryption layers is 200.")
 		return
 	}
@@ -164,7 +166,7 @@ func encryptFile(application fyne.App, files []string, key []byte, layers int, d
 		go func(filePath string) {
 			defer wg.Done()
 			fileDuration := time.Now()
-			isDir := false	// bool to track if driectory
+			isDir := false // bool to track if driectory
 
 			// Check if the file is already encrypted
 			if strings.HasSuffix(filePath, ".enc") {
@@ -203,11 +205,11 @@ func encryptFile(application fyne.App, files []string, key []byte, layers int, d
 			//progressBar.SetValue(10)
 
 			outputPath := filePath + ".enc"
-			
+
 			// Encrypt File
 			err = encryption.LayeredEncryptFile(inputFile, outputPath, string(key), layers)
 			//err = encryption.EncryptFile(inputFile, outputPath, string(key))
-			
+
 			if err != nil {
 				fmt.Printf("Error encrypting file: %v\n", err)
 				return
@@ -219,7 +221,7 @@ func encryptFile(application fyne.App, files []string, key []byte, layers int, d
 					fmt.Printf("%v\n", err)
 				}
 			}
-			
+
 			//progressBar.SetValue(100)
 			//win.Close()
 			fmt.Printf("File %d / %d Encrypted successfully in %s\n", index+1, len(files), time.Since(fileDuration))
@@ -262,14 +264,14 @@ func decryptFile(application fyne.App, files []string, key []byte, layers int, d
 
 			if err != nil {
 				//fmt.Printf("Decryption failed: %v\n", err)
-				
+
 				if application != nil {
 					//dialog.ShowError(errors.New("decryption failed: wrong password or corrupted data"), nil)
 					fmt.Printf("Decryption failed: %v\n", err)
 				} else {
 					fmt.Printf("Decryption failed: %v\n", err)
 				}
-				
+
 				return
 			}
 

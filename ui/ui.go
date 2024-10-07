@@ -26,7 +26,7 @@ func loadIcon() (fyne.Resource, error) {
 			return
 		}
 		exeDir := filepath.Dir(exePath)
-		iconPath := filepath.Join(exeDir, "images", "GoCrypt.png")
+		iconPath := filepath.Join(exeDir, "images", "GoCrypt256x256.png")
 
 		data, err := os.ReadFile(iconPath)
 		if err != nil {

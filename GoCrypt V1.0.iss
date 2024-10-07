@@ -7,7 +7,7 @@ PrivilegesRequired=admin
 ArchitecturesInstallIn64BitMode=x64
 AppId={{E4DAD780-F78A-406B-9B64-CCCE67B6C119}}
 AppName=GoCrypt
-AppVersion=1.1
+AppVersion=1.0
 DefaultDirName={autopf}\GoCrypt
 DefaultGroupName=GoCrypt
 OutputBaseFilename=GoCrypt Installer
@@ -16,6 +16,7 @@ SolidCompression=yes
 LicenseFile=LICENSE
 AppPublisher=Queball1999
 AppPublisherURL=https://github.com/queball1999/GoCrypt
+UninstallDisplayIcon={app}\gocrypt.exe
 
 [Files]
 ; Including the GoCrypt executable
@@ -32,6 +33,10 @@ Source: "images\*"; DestDir: "{app}\images"; Flags: recursesubdirs createallsubd
 [Icons]
 ; Creating a desktop icon for the application
 ;Name: "{commondesktop}\GoCrypt"; Filename: "{app}\gocrypt.exe"
+
+[Tasks]
+; Task to associate .enc files with GoCrypt
+Name: "associateenc"; Description: "Associate .enc files with GoCrypt"; GroupDescription: "File associations:"; Flags: unchecked
 
 [Run]
 ; Optional: Launch the application after installation
@@ -57,6 +62,12 @@ Root: HKLM; Subkey: "SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\CommandS
 Root: HKLM; Subkey: "SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\CommandStore\shell\GoCryptDecrypt"; ValueType: string; ValueName: ""; ValueData: "Decrypt"; Flags: uninsdeletekey createvalueifdoesntexist
 Root: HKLM; Subkey: "SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\CommandStore\shell\GoCryptDecrypt"; ValueType: string; ValueName: "Icon"; ValueData: "{app}\gocrypt.exe"; Flags: uninsdeletekey createvalueifdoesntexist
 Root: HKLM; Subkey: "SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\CommandStore\shell\GoCryptDecrypt\command"; ValueType: string; ValueName: ""; ValueData: """{app}\gocrypt.exe"" decrypt ""%1"""; Flags: uninsdeletekey createvalueifdoesntexist
+
+; Conditionally associate .enc files with GoCrypt based on the checkbox selection
+Root: HKCR; Subkey: ".enc"; ValueType: string; ValueName: ""; ValueData: "GoCrypt.encfile"; Flags: uninsdeletekey; Tasks: associateenc
+Root: HKCR; Subkey: "GoCrypt.encfile"; ValueType: string; ValueName: ""; ValueData: "GoCrypt Encrypted File"; Flags: uninsdeletekey; Tasks: associateenc
+Root: HKCR; Subkey: "GoCrypt.encfile\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\gocrypt.exe,0"; Flags: uninsdeletekey; Tasks: associateenc
+Root: HKCR; Subkey: "GoCrypt.encfile\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\gocrypt.exe"" decrypt ""%1"""; Flags: uninsdeletekey; Tasks: associateenc
 
 [Code]
 function InitializeSetup(): Boolean;
