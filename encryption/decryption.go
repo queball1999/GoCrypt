@@ -77,12 +77,26 @@ func DecryptFile(source *os.File, pathOut, password string) error {
 }
 
 // LayeredDecryptFile decrypts the file with multiple layers using ChaCha20-Poly1305.
-func LayeredDecryptFile(source *os.File, pathOut, password string, layers int) error {
+func LayeredDecryptFile(source *os.File, pathOut, password string) error {
     var currentSource *os.File = source
-    fmt.Printf("Initial source file: %s\n", source.Name())
 
-    for layer := 0; layer < layers; layer++ {
+	// Read the layer header before entering the loop
+    layerHeader := make([]byte, 1)
+    if _, err := io.ReadFull(currentSource, layerHeader); err != nil {
+        return fmt.Errorf("failed to read initial layer header: %v", err)
+    }
+    totalLayers := int(layerHeader[0])
+    fmt.Printf("Total layers to decrypt: %d\n", totalLayers)
+	
+    for layer := 0; layer < totalLayers; layer++ {
         fmt.Printf("\nStarting layer %d decryption...\n", layer+1)
+
+		// Skip the first byte (layer header) after the first loop
+        if layer > 0 {
+            if _, err := io.ReadFull(currentSource, layerHeader); err != nil {
+                return fmt.Errorf("failed to skip layer header: %v", err)
+            }
+        }
 
         // Read the nonce from the beginning of the file
         nonce := make([]byte, 24) // 24 bytes nonce
@@ -108,7 +122,9 @@ func LayeredDecryptFile(source *os.File, pathOut, password string, layers int) e
         if err != nil {
             return err
         }
-        fmt.Printf("Created temp file for layer %d: %s\n", layer+1, tmpFile.Name())
+        //fmt.Printf("Created temp file for layer %d: %s\n", layer+1, tmpFile.Name())
+
+		// leave below commented out
         //defer os.Remove(tmpFile.Name())
 
         // Buffer setup
@@ -120,9 +136,6 @@ func LayeredDecryptFile(source *os.File, pathOut, password string, layers int) e
             if n > 0 {
                 // Decrypt the buffer chunk
                 plaintext, err := aead.Open(plaintextBuffer[:0], nonce, encryptedBuffer[:n], nil)
-
-				// comment out for debugging
-				//fmt.Println("Plaintext", plaintext)
 
                 if err != nil {
                     return fmt.Errorf("layer %d decryption failed: %v", layer+1, err)
@@ -141,11 +154,11 @@ func LayeredDecryptFile(source *os.File, pathOut, password string, layers int) e
 
         // Explicitly close and flush temp file
         tmpFile.Close()
-        fmt.Printf("Closed temp file for layer %d: %s\n", layer+1, tmpFile.Name())
+        //fmt.Printf("Closed temp file for layer %d: %s\n", layer+1, tmpFile.Name())
 
         // Reopen temp file and reset file pointer to the beginning
         if currentSource != source {
-            fmt.Printf("Closing previous source file: %s\n", currentSource.Name())
+            //fmt.Printf("Closing previous source file: %s\n", currentSource.Name())
             currentSource.Close()
         }
 
@@ -153,7 +166,7 @@ func LayeredDecryptFile(source *os.File, pathOut, password string, layers int) e
         if err != nil {
             return err
         }
-        fmt.Printf("Opened new source file for layer %d: %s\n", layer+1, currentSource.Name())
+        //fmt.Printf("Opened new source file for layer %d: %s\n", layer+1, currentSource.Name())
     }
 
     // Final source close and rename the decrypted file to output path

@@ -12,7 +12,7 @@ _GoCrypt_ is a CLI and GUI file encryption tool specializing in fast, convenient
 
 `--no-ui, -n` - Disable the GUI. By default _gocrypt_ will use the GUI for all user interaction.
 
-`--layers, -l` - (**Coming Soon**) Define the layers of encryption. By default _gocrypt_ will use 5 layers of encryption.
+`--layers, -l` - Define the encryption layers (200 layers max). This applies only to encryption process, as the decryption process will automatically detect the number of layers based on the file header. By default, gocrypt applies 5 layers of encryption.
 
 *IMPORTANT* - These flags MUST be passed _before_ the file arguments. Please refer to examples below.
 
@@ -45,7 +45,6 @@ When a folder is passed as an argument, _GoCrypt_ will compress the folder into 
 
 ### Layers
 
-(**Coming Soon**)
 By default, _GoCrypt_ encrypts all files with 5 layers of encryption. This only affects the encryption process as the decryption process will auto-detect layers and decrypt accordingly. Check out [SPEC](https://github.com/queball1999/GoCrypt/blob/main/SPEC.md) for more information on the encryption/decryption algorithm.
 
 ### Installation

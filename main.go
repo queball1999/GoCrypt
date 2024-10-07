@@ -21,8 +21,7 @@ import (
 
 // FIXME: - Associate .enc files with application (done through inno setup)
 //		  - Optimize RAM usage (I see consistent 80-90MB usage. Can we condense?)
-//		  - Need to modify the user to explicitely state wether they are encrypting files or folders
-//		  - Layered encryption should be a while loop that detects layers. maybe we need layer count in header?
+//		  - Need to add MAX layer count of 256
 
 func main() {
 	// Define flags
@@ -41,6 +40,12 @@ func main() {
 	// Determine the command (encrypt, decrypt)
 	if len(flag.Args()) < 2 {
 		fmt.Println("Usage: GoCrypt [encrypt|decrypt] [file1 file2 ...] [flags]")
+		return
+	}
+
+	// limit to 200 layers
+	if (*layers > 200) {
+		fmt.Println("Error: Maximum allowed encryption layers is 200.")
 		return
 	}
 
@@ -90,13 +95,32 @@ func handleEncryption(application fyne.App, files []string, outputDir string, no
 			fmt.Printf("Error reading password: %v\n", err)
 			return
 		}
+
+		// Ask for password confirmation
+		fmt.Printf("Confirm password: ")
+		confirmPasswordBytes, err := term.ReadPassword(int(syscall.Stdin))
+		fmt.Println() // For a newline after confirmation input
+		if err != nil {
+			fmt.Printf("Error reading password confirmation: %v\n", err)
+			return
+		}
+
+		// Convert password and confirmation to strings
 		password := string(passwordBytes)
-		encryptFile(nil, files, []byte(password), layers, false)
+		confirmPassword := string(confirmPasswordBytes)
+
+		// Check if passwords match
+		if password != confirmPassword {
+			fmt.Println("Error: Passwords do not match. Please try again.")
+			return
+		}
+
+		encryptFile(nil, files, []byte(password), layers, false, noUI)
 
 	} else {
 		// Handle encryption with UI
 		ui.ShowPasswordPrompt(application, "encrypt", "chacha20poly1305", strings.Join(files, "\n"), func(password string, deleteAfter bool) {
-			encryptFile(application, files, []byte(password), layers, deleteAfter)
+			encryptFile(application, files, []byte(password), layers, deleteAfter, noUI)
 		})
 	}
 }
@@ -131,7 +155,7 @@ func handleFileNotExistError(application fyne.App, files []string, noUI bool) {
 	}
 }
 
-func encryptFile(application fyne.App, files []string, key []byte, layers int, deleteAfter bool) {
+func encryptFile(application fyne.App, files []string, key []byte, layers int, deleteAfter bool, noUI bool) {
 	var wg sync.WaitGroup
 	startTime := time.Now() // Track the time for the entire encryption process
 
@@ -174,13 +198,16 @@ func encryptFile(application fyne.App, files []string, key []byte, layers int, d
 			defer inputFile.Close()
 
 			// Render UI menu if no-ui is false
+			// I removed the ui.ShowProgressBar temporarily and will need to rebuild
 			//progressBar, _ := ui.ShowProgressBar(application, "GoCrypt - Encryption Progress", defaultLayers)
 			//progressBar.SetValue(10)
 
 			outputPath := filePath + ".enc"
 			
-			//err = encryption.EncryptFile(inputFile, outputPath, string(key))
+			// Encrypt File
 			err = encryption.LayeredEncryptFile(inputFile, outputPath, string(key), layers)
+			//err = encryption.EncryptFile(inputFile, outputPath, string(key))
+			
 			if err != nil {
 				fmt.Printf("Error encrypting file: %v\n", err)
 				return
@@ -228,18 +255,21 @@ func decryptFile(application fyne.App, files []string, key []byte, layers int, d
 
 			outputPath := filePath[:len(filePath)-4] // Remove .enc extension
 
-			err = encryption.LayeredDecryptFile(inputFile, outputPath, string(key), layers)
+			// Decrypt file
+			// No need to pass in layers, its auto-detecting
+			err = encryption.LayeredDecryptFile(inputFile, outputPath, string(key))
 			//err = encryption.DecryptFile(inputFile, outputPath, string(key))
+
 			if err != nil {
-				fmt.Printf("Decryption failed: %v\n", err)
-				/*
+				//fmt.Printf("Decryption failed: %v\n", err)
+				
 				if application != nil {
 					//dialog.ShowError(errors.New("decryption failed: wrong password or corrupted data"), nil)
 					fmt.Printf("Decryption failed: %v\n", err)
 				} else {
 					fmt.Printf("Decryption failed: %v\n", err)
 				}
-				*/
+				
 				return
 			}
 

@@ -84,6 +84,7 @@ func EncryptFile(source *os.File, pathOut, password string) error {
 }
 
 // LayeredEncryptFile encrypts the file with multiple layers using ChaCha20-Poly1305.
+// FIXME: Need a way to auto-detect layer count.
 func LayeredEncryptFile(source *os.File, pathOut, password string, layers int) error {
 	if layers <= 0 {
 		return fmt.Errorf("invalid number of layers: %d", layers)
@@ -120,7 +121,11 @@ func LayeredEncryptFile(source *os.File, pathOut, password string, layers int) e
 		}
 		defer os.Remove(tmpFile.Name())
 
-		// Write the nonce and salt to the temp file
+		// Write the headers to the temp file (layer, nonce, and salt)
+		layerHeader := []byte{byte(layer + 1)} // Convert the current layer to a 1-byte value
+		if _, err := tmpFile.Write(layerHeader); err != nil {
+			return fmt.Errorf("failed to write layer header: %v", err)
+		}
 		if _, err := tmpFile.Write(nonce); err != nil {
 			return fmt.Errorf("failed to write nonce: %v", err)
 		}

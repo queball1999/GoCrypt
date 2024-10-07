@@ -8,7 +8,11 @@ _GoCrypt_ employs the ChaCha20-Poly1305 authenticated encryption algorithm, whic
 Upon generating the key, a 24-byte nonce is randomly generated for each encryption operation. The encryption process uses an "Encrypt-then-MAC" (EtM) construction, where the Poly1305 MAC is computed over the ciphertext to ensure data integrity and authenticity.
 
 ### Layered Encryption
-(**Coming Soon**) _GoCrypt_ offers an optional layered encryption feature, where each data chunk is encrypted multiple times, each with a different salt creating a unique key for each layer. The number of layers can be specified by the user, with each layer adding an additional level of security.
+_GoCrypt_ offers an optional layered encryption feature, where each data chunk is encrypted multiple times, each with a different salt creating a unique key for each layer. The number of layers can be specified by the user, with each layer adding an additional level of security.
+
+The maximum number of layers is limited to **200**, ensuring optimal performance during both encryption and decryption processes. This limitation is enforced to balance security with resource consumption, as increasing the number of layers also increases processing time and memory requirements.
+
+Layer count is stored in the first byte ofg the header. This integer indicates the number of encryption layers applied to the current data. This header is critical for guiding the decryption process, allowing it to iterate through the correct number of layers.
 
 ### Data Chunks
 To optimize memory usage, _GoCrypt_ chunks the data and "streams" it to the output file in a controlled manner. This method ensures that only a portion of the data is kept in memory at any given time, significantly reducing the application's overall memory footprint. Each chunk is encrypted separately, and in the case of layered encryption, each chunk undergoes multiple rounds of encryption before being written to the file.
@@ -16,6 +20,6 @@ To optimize memory usage, _GoCrypt_ chunks the data and "streams" it to the outp
 ### File Format
 An encrypted file (.enc) has the following structure. The format is designed to provide plausible deniability, meaning the file is generally indistinguishable from other types of data, such as compressed or randomly generated files.
 
-| nonce    | scrypt salt | ecnrypted file contents |
-| -------- | ----------- | ----------------------- |
-| 12 bytes | 16 bytes    | 0~256GiB                |
+| layer    | nonce    | salt     | ecnrypted file contents |
+| -------- | -------- | -------- | ----------------------- |
+| 1 byte   | 24 bytes | 16 bytes | 0~256GiB                |

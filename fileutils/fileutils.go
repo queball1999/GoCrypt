@@ -21,17 +21,38 @@ func DeleteFile(filePath string) error {
 
 // IsFileProtected checks if the file should be skipped from encryption (e.g., GoCrypt files).
 func IsFileProtected(filePath string) bool {
+	// Normalize the file path for consistent comparison
+	filePath = strings.ToLower(filePath)
+
 	// Get the current working directory
+	/*
 	currentDir, err := os.Getwd()
+	fmt.Println("Workign Directory: ", currentDir)
 	if err != nil {
 		fmt.Printf("Error getting current directory: %v\n", err)
-		return false
-	}
-
-	// Check if the file is within any GoCrypt-related directory or is GoCrypt executable
-	if strings.Contains(filePath, "GoCrypt") || strings.Contains(filePath, "gocrypt.exe") || strings.HasPrefix(filePath, currentDir) {
 		return true
 	}
+	*/
+
+	// Check if the file path is the GoCrypt executable itself
+	if strings.Contains(filePath, "gocrypt.exe") {
+		fmt.Printf("Protected path: %s is the GoCrypt executable. This file cannot be encrypted or decrypted.\n", filePath)
+		return true
+	}
+
+	// Check if the file is in the GoCrypt installation directory (C:\Program Files\GoCrypt)
+	if strings.HasPrefix(filePath, `c:\program files\gocrypt`) {
+		fmt.Printf("Protected path: %s is within the GoCrypt installation directory. Files in this directory are protected.\n", filePath)
+		return true
+	}
+
+	// Optionally, block common system directories (e.g., C:\Windows)
+	if strings.Contains(filePath, `c:\windows`) {
+		fmt.Printf("Protected path: %s is a system directory (Windows). This file cannot be encrypted or decrypted.\n", filePath)
+		return true
+	}
+
+	// Allow everything else
 	return false
 }
 
