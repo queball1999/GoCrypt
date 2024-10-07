@@ -22,6 +22,7 @@ UninstallDisplayIcon={app}\gocrypt.exe
 ; Including the GoCrypt executable
 Source: "gocrypt.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "main.go"; DestDir: "{app}"; Flags: ignoreversion
+Source: "icon.ico"; DestDir: "{app}"; Flags: ignoreversion
 Source: "README.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "LICENSE"; DestDir: "{app}"; Flags: ignoreversion
 

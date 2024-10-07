@@ -4,7 +4,9 @@
   <img src="images/GoCrypt128x128.png" alt="GoCrypt Logo" />
 </p>
 
-**This project is under development and may not work properly. Please report any issues**
+**This encryption software is currently in development and has not undergone stress testing or third-party security audits. Please ensure that you back up your data before use, and do not use it for sensitive or irreplaceable data. Use at your own risk.**
+
+---
 
 _GoCrypt_ is a CLI and GUI file encryption tool specializing in fast, convenient, and secure file encryption. With seamless integration into the Windows context menu, _GoCrypt_ allows you to encrypt and decrypt files directly from your file explorer with ease. Leveraging Go and the ChaCha20-Poly1305 encryption algorithm, _GoCrypt_ boasts high performance and robust security.
 
