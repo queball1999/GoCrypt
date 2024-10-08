@@ -63,7 +63,7 @@ For the latest pre-built binaries of the application, check the [Releases](https
 
 Once installed, simply right-click on any file or folder in Windows Explorer and select the GoCrypt option from the context menu. You will be prompted to enter a password to either encrypt or decrypt the selected item.
 
-_GoCrypt_ offers a GUI for interacting with files and by default is enabled for all interactions through the CLI, context menu, or clicking directly on the desktop icon. 
+_GoCrypt_ offers a GUI for interacting with files and by default is enabled for all interactions through the CLI, context menu, or clicking directly on any .enc file. 
 
 When launching _GoCrypt_ without any command line parameters, the user will be presented with a window allowing them to choose files for encryption.
 

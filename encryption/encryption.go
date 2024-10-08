@@ -7,24 +7,18 @@ import (
 	"os"
 
 	"golang.org/x/crypto/chacha20poly1305"
+
+	
 )
 
 // EncryptFile encrypts the file at the given path and writes the encrypted data to the output path using ChaCha20-Poly1305.
+// THIS FUNCTION IS DEPRECIATED BUT STILL FUNCTIONAL
 func EncryptFile(source *os.File, pathOut, password string) error {
-	/*
-	logFile, err := os.Create("encryption.log")
-	if err != nil {
-		return fmt.Errorf("failed to create log file: %v", err)
-	}
-	defer logFile.Close()
-	*/
-
 	// Generate a unique salt for each file
 	salt, err := GenerateSalt()
 	if err != nil {
 		return err
 	}
-	//fmt.Fprintf(logFile, "Salt: %x\n", salt)
 
 	aead, err := chacha20poly1305.NewX(DeriveKey(password, salt))
 	if err != nil {
@@ -36,7 +30,6 @@ func EncryptFile(source *os.File, pathOut, password string) error {
 	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
 		return fmt.Errorf("failed to generate nonce: %v", err)
 	}
-	//fmt.Fprintf(logFile, "Nonce: %x\n", nonce)
 
 	// Create temp file
 	tmpFile, err := os.CreateTemp("", "*.tmp")
@@ -60,7 +53,6 @@ func EncryptFile(source *os.File, pathOut, password string) error {
 	for {
 		n, err := source.Read(buffer)
 		if n > 0 {
-			//fmt.Fprintf(logFile, "Decrypting chunk of size: %d bytes with nonce: %x\n", n, nonce)
 			// Encrypt the buffer chunk
 			ciphertext := aead.Seal(encryptedBuffer[:0], nonce, buffer[:n], nil)
 			if _, err := tmpFile.Write(ciphertext); err != nil {
@@ -84,23 +76,21 @@ func EncryptFile(source *os.File, pathOut, password string) error {
 }
 
 // LayeredEncryptFile encrypts the file with multiple layers using ChaCha20-Poly1305.
-// FIXME: Need a way to auto-detect layer count.
 func LayeredEncryptFile(source *os.File, pathOut, password string, layers int) error {
-	if layers <= 0 {
+    if layers <= 0 {
 		return fmt.Errorf("invalid number of layers: %d", layers)
 	}
 
 	var currentSource *os.File = source
 
 	for layer := 0; layer < layers; layer++ {
-		fmt.Printf("Starting layer %d encryption...\n", layer+1)
+		//fmt.Printf("Starting layer %d encryption...\n", layer+1)
 
 		// Generate a unique salt for each layer
 		salt, err := GenerateSalt()
 		if err != nil {
 			return err
 		}
-		fmt.Printf("Salt: %x\n", salt)
 
 		aead, err := chacha20poly1305.NewX(DeriveKey(password, salt))
 		if err != nil {
@@ -112,7 +102,6 @@ func LayeredEncryptFile(source *os.File, pathOut, password string, layers int) e
 		if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
 			return fmt.Errorf("failed to generate nonce: %v", err)
 		}
-		fmt.Printf("Nonce: %x\n", nonce)
 
 		// Create temp file for current layer
 		tmpFile, err := os.CreateTemp("", "*.tmp")
@@ -167,10 +156,18 @@ func LayeredEncryptFile(source *os.File, pathOut, password string, layers int) e
 	}
 
 	currentSource.Close()
-	// Rename the final temp file to the output path
-	if err := os.Rename(currentSource.Name(), pathOut); err != nil {
-		return err
+
+	// Copy the contents of the temp file to the output file
+	err := copyFile(currentSource.Name(), pathOut)
+	if err != nil {
+		return fmt.Errorf("failed to copy file: %v", err)
 	}
 
-	return nil
+	// Remove the temp file after a successful copy
+	err = os.Remove(currentSource.Name())
+	if err != nil {
+		return fmt.Errorf("failed to remove temp file: %v", err)
+	}
+
+    return nil
 }

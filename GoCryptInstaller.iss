@@ -7,7 +7,7 @@ PrivilegesRequired=admin
 ArchitecturesInstallIn64BitMode=x64
 AppId={{E4DAD780-F78A-406B-9B64-CCCE67B6C119}}
 AppName=GoCrypt
-AppVersion=1.0
+AppVersion=1.1
 DefaultDirName={autopf}\GoCrypt
 DefaultGroupName=GoCrypt
 OutputBaseFilename=GoCrypt Installer
@@ -37,7 +37,7 @@ Source: "images\*"; DestDir: "{app}\images"; Flags: recursesubdirs createallsubd
 
 [Tasks]
 ; Task to associate .enc files with GoCrypt
-Name: "associateenc"; Description: "Associate .enc files with GoCrypt"; GroupDescription: "File associations:"; Flags: unchecked
+Name: "associateenc"; Description: "Associate .enc files with GoCrypt"; GroupDescription: "File associations:"; Flags: checked
 
 [Run]
 ; Optional: Launch the application after installation

@@ -92,7 +92,7 @@ func ShowPasswordPrompt(application fyne.App, action, method, filePath string, o
 	window.ShowAndRun()
 }
 
-func ShowErrorDialog(application fyne.App, message string) {
+func ShowErrorDialogOLD(application fyne.App, message string) {
 	icon, err := loadIcon()
 	if err != nil {
 		fmt.Println(err)
@@ -109,3 +109,36 @@ func ShowErrorDialog(application fyne.App, message string) {
 	infoDialog.Show()
 	window.ShowAndRun()
 }
+
+func ShowErrorDialog(application fyne.App, message string) {
+	icon, err := loadIcon()
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	// Create a new window for the error dialog
+	window := application.NewWindow("Error")
+	window.Resize(fyne.NewSize(450, 215))
+	window.CenterOnScreen()
+	window.SetIcon(icon)
+
+	// Use NewLabel and set the Wrapping property to ensure the message is wrapped
+	label := widget.NewLabel(message)
+	label.Wrapping = fyne.TextWrapWord
+
+	// Create a custom dialog with the wrapped label content
+	dialogContent := container.NewVBox(label)
+	dialog := dialog.NewCustom("Error", "OK", dialogContent, window)
+
+	// Adjust the dialog size to prevent narrow appearance
+	dialog.Resize(fyne.NewSize(450, 215))
+
+	// Set the window close function when the dialog is closed
+	dialog.SetOnClosed(func() { window.Close() })
+	
+	// Show the dialog and window
+	dialog.Show()
+	window.ShowAndRun()
+}
+

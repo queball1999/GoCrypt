@@ -20,6 +20,8 @@ To optimize memory usage, _GoCrypt_ chunks the data and "streams" it to the outp
 ### File Format
 An encrypted file (.enc) has the following structure. The format is designed to provide plausible deniability, meaning the file is generally indistinguishable from other types of data, such as compressed or randomly generated files.
 
+The file extension is not important, _GoCrypt_ will attempt to decrypt any file as long as the headers and encrypted content is detected.
+
 | layer    | nonce    | salt     | ecnrypted file contents |
 | -------- | -------- | -------- | ----------------------- |
 | 1 byte   | 24 bytes | 16 bytes | 0~256GiB                |

@@ -1,6 +1,8 @@
 package encryption
 
 import (
+    "io"
+	"os"
     "fmt"
     "crypto/rand"
     "crypto/sha256"
@@ -27,4 +29,22 @@ func incrementNonce(nonce []byte) {
             break
         }
     }
+}
+
+// Helper function to copy file contents
+func copyFile(src, dst string) error {
+    sourceFile, err := os.Open(src)
+    if err != nil {
+        return err
+    }
+    defer sourceFile.Close()
+
+    destinationFile, err := os.Create(dst)
+    if err != nil {
+        return err
+    }
+    defer destinationFile.Close()
+
+    _, err = io.Copy(destinationFile, sourceFile)
+    return err
 }
