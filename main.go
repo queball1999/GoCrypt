@@ -129,6 +129,7 @@ func encryptFiles(application fyne.App, files []string, key []byte, layers int, 
 				success = false
 				//handleError(application, err, noUI)
 				fmt.Println(err)
+				logger.Println(err)
 			}
 		}(index, filePath)
 	}
@@ -180,9 +181,12 @@ func performFileEncryption(index int, filePath string, key []byte, layers int, d
 	if err := encryption.LayeredEncryptFile(inputFile, outputPath, string(key), layers); err != nil {
 		return fmt.Errorf("error encrypting file: %v", err)
 	}
+	
+	inputFile.Close()	// Ensure file is closed
 
 	// Optionally delete the original file
 	if deleteAfter || isDir {
+		logger.Printf("Deleting the following item during encryption: %v", filePath)
 		if err := fileutils.DeleteFile(filePath); err != nil {
 			return fmt.Errorf("error deleting file: %v", err)
 		}
@@ -207,6 +211,7 @@ func decryptFiles(application fyne.App, files []string, key []byte, layers int, 
 				success = false
 				//handleError(application, err, noUI)
 				fmt.Println(err)
+				logger.Println(err)
 			}
 		}(index, filePath)
 	}
@@ -248,9 +253,12 @@ func performFileDecryption(index int, filePath string, key []byte, deleteAfter b
 		}
 	}
 
+	inputFile.Close()	// Ensure file is closed	
+
 	// Optionally delete the encrypted file
 	if deleteAfter {
 		if err := fileutils.DeleteFile(filePath); err != nil {
+			logger.Printf("Deleting the following item during decryption: %v", filePath)
 			return fmt.Errorf("error deleting file: %v", err)
 		}
 	}
