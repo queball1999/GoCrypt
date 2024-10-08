@@ -78,7 +78,7 @@ This software is provided "as is", without warranty of any kind, express or impl
 ### Known Issues
 
 - There is an issue generating new GUI windows after the main window closes. All output after initial window will be displayed to the terminal.
-- Feature to detect if file in encrypted is a work in progress.
+- Feature to detect if file in encrypted is a work in progress. As of now _GoCrypt_ requires the .enc file extension.
 
 ### Acknowledgements
 

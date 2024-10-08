@@ -23,3 +23,6 @@ go.work
 
 # Exclude Windows thumbnail cache files
 thumbs.db
+
+#Exclude logs
+*.log

@@ -3,11 +3,45 @@ package fileutils
 import (
 	"archive/zip"
 	"fmt"
+	"log"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
 )
+
+// initLogger initializes the logger
+func InitLogger() *log.Logger {
+    logDir := "log"
+    logFilePath := logDir + "/app.log"
+
+    // Ensure the log directory exists
+    if err := os.MkdirAll(logDir, 0755); err != nil {
+        fmt.Printf("Failed to create log directory: %v\n", err)
+        return nil
+    }
+
+    // Open the log file in append mode, create if it doesn't exist
+    logFile, err := os.OpenFile(logFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+    if err != nil {
+        fmt.Printf("Failed to open log file: %v\n", err)
+        return nil
+    }
+
+	// Create a logger that writes to both the log file and stdout, with custom timestamp format
+	return log.New(logFile, "GoCrypt: ", log.Ldate|log.Ltime|log.Lmicroseconds|log.Lshortfile)
+}
+
+// CheckFilesExist verifies whether the provided files exist. Returns a slice of non-existent files.
+func CheckFilesExist(files []string) []string {
+	var nonExistentFiles []string
+	for _, file := range files {
+		if _, err := os.Stat(file); os.IsNotExist(err) {
+			nonExistentFiles = append(nonExistentFiles, file)
+		}
+	}
+	return nonExistentFiles
+}
 
 // DeleteFile deletes the specified file.
 func DeleteFile(filePath string) error {

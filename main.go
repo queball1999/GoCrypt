@@ -3,14 +3,11 @@ package main
 import (
 	"flag"
 	"fmt"
+	"log"
 	"os"
 	"strings"
 	"sync"
 	"time"
-
-	"syscall"
-
-	"golang.org/x/term"
 
 	"GoCrypt/encryption"
 	"GoCrypt/fileutils"
@@ -20,10 +17,15 @@ import (
 	"fyne.io/fyne/v2/app"
 )
 
+var logger *log.Logger
+
 // Main function initializes flags, processes inputs, and handles encryption/decryption based on commands.
 func main() {
+	// Initialize logger
+	logger = fileutils.InitLogger()
+
 	// Define and parse command-line flags
-	outputDir, noUI, layers := setupFlags()
+	outputDir, noUI, layers := ui.SetupFlags()
 
 	// Initialize the Fyne app only if necessary
 	var application fyne.App
@@ -48,12 +50,14 @@ func main() {
 	files := flag.Args()[1:]
 
 	// Check if all files exist
-	if nonExistentFiles := checkFilesExist(files); len(nonExistentFiles) > 0 {
-		handleFileNotExistError(application, nonExistentFiles, *noUI)
+	if nonExistentFiles := fileutils.CheckFilesExist(files); len(nonExistentFiles) > 0 {
+		errorMessage := fmt.Sprintf("the following files do not exist:\n%s", strings.Join(files, "\n"))
+		handleError(application, fmt.Errorf("%s", errorMessage), *noUI)
 		return
 	}
 
-	// Function to detect file types and automatically route user
+	// Function to detect file types
+	// WORK IN PROGRESS
 	/*
 	err := fileutils.CheckFileCommand(files, command)
 	if err != nil {
@@ -74,43 +78,10 @@ func main() {
 	}
 }
 
-// setupFlags initializes the command-line flags and returns pointers to the flag variables.
-func setupFlags() (*string, *bool, *int) {
-	outputDir := flag.String("output", "", "Specify the output directory")
-	flag.StringVar(outputDir, "o", "", "Specify the output directory (alias: -o)")
-
-	noUI := flag.Bool("no-ui", false, "Disable the GUI")
-	flag.BoolVar(noUI, "n", false, "Disable the GUI (alias: -n)")
-
-	layers := flag.Int("layers", 5, "Layers of encryption")
-	flag.IntVar(layers, "l", 5, "Layers of encryption (alias: -l)")
-
-	flag.Parse()
-
-	return outputDir, noUI, layers
-}
-
-// checkFilesExist verifies whether the provided files exist. Returns a slice of non-existent files.
-func checkFilesExist(files []string) []string {
-	var nonExistentFiles []string
-	for _, file := range files {
-		if _, err := os.Stat(file); os.IsNotExist(err) {
-			nonExistentFiles = append(nonExistentFiles, file)
-		}
-	}
-	return nonExistentFiles
-}
-
-// handleFileNotExistError displays an error message for non-existent files based on the UI mode.
-func handleFileNotExistError(application fyne.App, files []string, noUI bool) {
-	errorMessage := fmt.Sprintf("the following files do not exist:\n%s", strings.Join(files, "\n"))
-	handleError(application, fmt.Errorf("%s", errorMessage), noUI)
-}
-
 // handleEncryption manages encryption logic based on whether the UI is enabled or not.
 func handleEncryption(application fyne.App, files []string, outputDir string, noUI bool, layers int) {
 	if noUI {
-		password, err := promptPasswordCLI()
+		password, err := ui.PromptPasswordCLI()
 		if err != nil {
 			fmt.Printf("Error reading password: %v\n", err)
 			return
@@ -128,7 +99,7 @@ func handleEncryption(application fyne.App, files []string, outputDir string, no
 // handleDecryption manages decryption logic based on whether the UI is enabled or not.
 func handleDecryption(application fyne.App, files []string, outputDir string, noUI bool, layers int) {
 	if noUI {
-		password, err := promptPasswordCLI()
+		password, err := ui.PromptPasswordCLI()
 		if err != nil {
 			fmt.Printf("Error reading password: %v\n", err)
 			return
@@ -141,34 +112,6 @@ func handleDecryption(application fyne.App, files []string, outputDir string, no
 			decryptFiles(application, files, []byte(password), layers, deleteAfter, noUI)
 		})
 	}
-}
-
-// promptPasswordCLI handles secure password input for CLI mode.
-func promptPasswordCLI() (string, error) {
-	// Read password from the terminal securely
-	fmt.Printf("Enter password: ")
-	passwordBytes, err := term.ReadPassword(int(syscall.Stdin))
-	fmt.Println() // Newline after password input
-	if err != nil {
-		return "", err
-	}
-
-	// Ask for password confirmation
-	fmt.Printf("Confirm password: ")
-	confirmPasswordBytes, err := term.ReadPassword(int(syscall.Stdin))
-	fmt.Println()
-	if err != nil {
-		return "", err
-	}
-
-	password := string(passwordBytes)
-	confirmPassword := string(confirmPasswordBytes)
-
-	if password != confirmPassword {
-		return "", fmt.Errorf("passwords do not match")
-	}
-
-	return password, nil
 }
 
 // encryptFiles performs the encryption on the provided files using the specified password and options.
@@ -192,7 +135,8 @@ func encryptFiles(application fyne.App, files []string, key []byte, layers int, 
 
 	wg.Wait()
 	if success {
-		fmt.Printf("all files encrypted successfully in: %s", time.Since(startTime))
+		fmt.Printf("All files encrypted successfully in: %s", time.Since(startTime))
+		logger.Printf("All files encrypted successfully in: %s", time.Since(startTime))
 	}
 }
 
@@ -204,12 +148,14 @@ func performFileEncryption(index int, filePath string, key []byte, layers int, d
 	// Skip already encrypted files
 	//FIXME: update with IsFileEncrypted function in fileutils
 	if strings.HasSuffix(filePath, ".enc") {
-		return fmt.Errorf("file %s is already encrypted. Skipping... ", filePath)
+		logger.Printf("file %s is already encrypted. Skipping... ", filePath)
+		return nil
 	}
 
 	// Check if the file is protected
 	if fileutils.IsFileProtected(filePath) {
-		return fmt.Errorf("skipping protected file: %s", filePath)
+		logger.Printf("skipping protected file: %s", filePath)
+		return nil
 	}
 
 	// If it's a directory, compress it first
@@ -241,8 +187,8 @@ func performFileEncryption(index int, filePath string, key []byte, layers int, d
 			return fmt.Errorf("error deleting file: %v", err)
 		}
 	}
-
-	fmt.Printf("File %d / %d encrypted successfully in %s\n", index+1, fileLength, time.Since(startTime))
+	
+	logger.Printf("File %d / %d encrypted successfully in %s\n", index+1, fileLength, time.Since(startTime))
 	return nil
 }
 
@@ -252,30 +198,35 @@ func decryptFiles(application fyne.App, files []string, key []byte, layers int, 
 	startTime := time.Now()
 	success := true
 
-	for _, filePath := range files {
+	for index, filePath := range files {
 		wg.Add(1)
-		go func(filePath string) {
+		go func(index int, filePath string) {
 			defer wg.Done()
-			err := performFileDecryption(filePath, key, deleteAfter)
+			err := performFileDecryption(index, filePath, key, deleteAfter, len(files))
 			if (err != nil) {
 				success = false
 				//handleError(application, err, noUI)
 				fmt.Println(err)
 			}
-		}(filePath)
+		}(index, filePath)
 	}
 
 	wg.Wait()
 	if success {
-		fmt.Printf("all files decrypted successfully in: %s\n", time.Since(startTime))
+		fmt.Printf("All files decrypted successfully in: %s", time.Since(startTime))
+		logger.Printf("All files decrypted successfully in: %s", time.Since(startTime))
 	}
 }
 
 // performFileDecryption handles decryption of a single file and reports the status.
-func performFileDecryption(filePath string, key []byte, deleteAfter bool) error{
+func performFileDecryption(index int, filePath string, key []byte, deleteAfter bool, fileLength int) error{
+	startTime := time.Now()
+	
 	// Skip files that are not encrypted
+	// FIXME: Replace with IsFileEncrypted method
 	if !strings.HasSuffix(filePath, ".enc") {
-		return fmt.Errorf("file %s is not encrypted. Skipping... ", filePath)
+		logger.Printf("file %s is not encrypted. Skipping... ", filePath)
+		return nil
 	}
 
 	// Open the input file for decryption
@@ -303,11 +254,14 @@ func performFileDecryption(filePath string, key []byte, deleteAfter bool) error{
 			return fmt.Errorf("error deleting file: %v", err)
 		}
 	}
-
+	logger.Printf("File %d / %d decrypted successfully in %s\n", index+1, fileLength, time.Since(startTime))
 	return nil
 }
 
 func handleError(application fyne.App, err error, noUI bool) {
+	// print error to log file regardless
+	logger.Printf("Error: %v\n", err)
+
     if noUI {
         fmt.Printf("Error: %v\n", err)
     } else {

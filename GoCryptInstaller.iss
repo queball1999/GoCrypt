@@ -2,12 +2,15 @@
 ; SEE THE DOCUMENTATION FOR DETAILS ON CREATING INNO SETUP SCRIPT FILES!
 
 [Setup]
+; Define the AppVersion preprocessor variable
+#define AppVersion "1.1"
+
 ; General settings
 PrivilegesRequired=admin
 ArchitecturesInstallIn64BitMode=x64
 AppId={{E4DAD780-F78A-406B-9B64-CCCE67B6C119}}
 AppName=GoCrypt
-AppVersion=1.1
+AppVersion={#AppVersion}
 DefaultDirName={autopf}\GoCrypt
 DefaultGroupName=GoCrypt
 OutputBaseFilename=GoCrypt-Installer-{#AppVersion}
