@@ -10,7 +10,7 @@ AppName=GoCrypt
 AppVersion=1.1
 DefaultDirName={autopf}\GoCrypt
 DefaultGroupName=GoCrypt
-OutputBaseFilename=GoCrypt Installer
+OutputBaseFilename=GoCrypt-Installer-{#AppVersion}
 Compression=lzma
 SolidCompression=yes
 LicenseFile=LICENSE
@@ -37,7 +37,10 @@ Source: "images\*"; DestDir: "{app}\images"; Flags: recursesubdirs createallsubd
 
 [Tasks]
 ; Task to associate .enc files with GoCrypt
-Name: "associateenc"; Description: "Associate .enc files with GoCrypt"; GroupDescription: "File associations:"; Flags: checked
+Name: "associateenc"; Description: "Associate .enc files with GoCrypt"; GroupDescription: "File associations:"
+
+; Task to add GoCrypt to system PATH
+Name: "addtopath"; Description: "Add GoCrypt to the system PATH"; GroupDescription: "Additional tasks:"
 
 [Run]
 ; Optional: Launch the application after installation
@@ -76,10 +79,76 @@ begin
   Result := True;
 end;
 
+procedure AddToSystemAndUserPath(PathToAdd: string);
+var
+  CurrentPath, NewPath: string;
+begin
+  // Update system-level PATH
+  if RegQueryStringValue(HKLM, 'SYSTEM\CurrentControlSet\Control\Session Manager\Environment', 'Path', CurrentPath) then
+  begin
+    if Pos(';' + PathToAdd + ';', ';' + CurrentPath + ';') = 0 then
+    begin
+      if (CurrentPath <> '') and (CurrentPath[Length(CurrentPath)] <> ';') then
+        CurrentPath := CurrentPath + ';';
+      NewPath := CurrentPath + PathToAdd;
+      RegWriteStringValue(HKLM, 'SYSTEM\CurrentControlSet\Control\Session Manager\Environment', 'Path', NewPath);
+    end;
+  end;
+
+  // Update user-level PATH
+  if RegQueryStringValue(HKCU, 'Environment', 'Path', CurrentPath) then
+  begin
+    if Pos(';' + PathToAdd + ';', ';' + CurrentPath + ';') = 0 then
+    begin
+      if (CurrentPath <> '') and (CurrentPath[Length(CurrentPath)] <> ';') then
+        CurrentPath := CurrentPath + ';';
+      NewPath := CurrentPath + PathToAdd;
+      RegWriteStringValue(HKCU, 'Environment', 'Path', NewPath);
+    end;
+  end;
+end;
+
+procedure RemoveFromSystemAndUserPath(PathToRemove: string);
+var
+  CurrentPath, NewPath: string;
+  PosToRemove: Integer;
+begin
+  // Remove from system-level PATH
+  if RegQueryStringValue(HKLM, 'SYSTEM\CurrentControlSet\Control\Session Manager\Environment', 'Path', CurrentPath) then
+  begin
+    PosToRemove := Pos(';' + PathToRemove, CurrentPath);
+    if PosToRemove > 0 then
+    begin
+      Delete(CurrentPath, PosToRemove, Length(';' + PathToRemove));
+      RegWriteStringValue(HKLM, 'SYSTEM\CurrentControlSet\Control\Session Manager\Environment', 'Path', CurrentPath);
+    end;
+  end;
+
+  // Remove from user-level PATH
+  if RegQueryStringValue(HKCU, 'Environment', 'Path', CurrentPath) then
+  begin
+    PosToRemove := Pos(';' + PathToRemove, CurrentPath);
+    if PosToRemove > 0 then
+    begin
+      Delete(CurrentPath, PosToRemove, Length(';' + PathToRemove));
+      RegWriteStringValue(HKCU, 'Environment', 'Path', CurrentPath);
+    end;
+  end;
+end;
+
 procedure CurStepChanged(CurStep: TSetupStep);
 begin
   if CurStep = ssPostInstall then
   begin
+    AddToSystemAndUserPath(ExpandConstant('{app}'));
     MsgBox('Installation complete! To use GoCrypt, simply right-click on any file or folder and select the "GoCrypt" option from the context menu.', mbInformation, MB_OK);
+  end;
+end;
+
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+begin
+  if CurUninstallStep = usUninstall then
+  begin
+    RemoveFromSystemAndUserPath(ExpandConstant('{app}'));
   end;
 end;

@@ -54,13 +54,15 @@ func main() {
 	}
 
 	// Function to detect file types and automatically route user
+	/*
 	err := fileutils.CheckFileCommand(files, command)
 	if err != nil {
 		// Display error either in terminal or UI based on no-ui flag
 		handleError(application, err, *noUI)
 		return
 	}
-
+	*/
+	
 	// Handle the encryption or decryption command
 	switch command {
 	case "encrypt", "enc", "e":

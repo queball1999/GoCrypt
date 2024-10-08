@@ -75,6 +75,11 @@ The installer is generated using [Inno Setup](https://jrsoftware.org/isinfo.php)
 
 This software is provided "as is", without warranty of any kind, express or implied. Use it at your own risk.
 
+### Known Issues
+
+- There is an issue generating new GUI windows after the main window closes. All output after initial window will be displayed to the terminal.
+- Feature to detect if file in encrypted is a work in progress.
+
 ### Acknowledgements
 
 This software derives inspiration from [70sh1's](https://github.com/70sh1) project [eddy](https://github.com/70sh1/eddy/tree/main).

@@ -56,7 +56,8 @@ func IsFileProtected(filePath string) bool {
 	return false
 }
 
-// Check if the file in encrypted by GoCrypt
+// Check if the file is encrypted by GoCrypt based on the header format
+// WORK IN PROGRESS
 func IsFileEncrypted(filePath string) (bool, error) {
     file, err := os.Open(filePath)
     if err != nil {
@@ -77,13 +78,24 @@ func IsFileEncrypted(filePath string) (bool, error) {
 
     // Check the layer value (first byte)
     layer := header[0]
+	fmt.Println("layer:", layer)
     if layer < 1 || layer > 200 {
         // Invalid layer, not an encrypted file
         return false, nil
     }
 
-    // Optionally, further checks on the nonce and salt can be added here if necessary
+    // Optional: you could add checks to validate the nonce and salt further if necessary.
+    nonce := header[1:25] // 24 bytes nonce
+    salt := header[25:41] // 16 bytes salt
+	fmt.Println("salt:", salt)
+	fmt.Println("nonce:", nonce)
 
+    // Further validation on nonce and salt can be added here if desired.
+    if len(nonce) != 24 || len(salt) != 16 {
+        return false, fmt.Errorf("invalid nonce or salt size")
+    }
+
+    // File has a valid GoCrypt header
     return true, nil
 }
 
@@ -105,6 +117,7 @@ func CheckFileCommand(files []string, action string) error {
 
 		// Check if the file is encrypted
 		encrypted, err := IsFileEncrypted(filePath)
+		fmt.Println("Is file encrypted?", encrypted, err)
 		if err != nil {
 			return err
 		}
