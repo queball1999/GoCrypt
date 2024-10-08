@@ -83,7 +83,7 @@ func handleEncryption(application fyne.App, files []string, outputDir string, no
 	if noUI {
 		password, err := ui.PromptPasswordCLI()
 		if err != nil {
-			fmt.Printf("Error reading password: %v\n", err)
+			fmt.Printf("Error: %v\n", err)
 			return
 		}
 
@@ -101,7 +101,7 @@ func handleDecryption(application fyne.App, files []string, outputDir string, no
 	if noUI {
 		password, err := ui.PromptPasswordCLI()
 		if err != nil {
-			fmt.Printf("Error reading password: %v\n", err)
+			fmt.Printf("Error: %v\n", err)
 			return
 		}
 

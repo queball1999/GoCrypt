@@ -7,29 +7,50 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 )
 
 // initLogger initializes the logger
 func InitLogger() *log.Logger {
-    logDir := "log"
-    logFilePath := logDir + "/app.log"
+    // Get the user's home directory
+    homeDir, err := os.UserHomeDir()
+    if err != nil {
+        fmt.Printf("Failed to get user home directory: %v\n", err)
+        return nil
+    }
 
-    // Ensure the log directory exists
-    if err := os.MkdirAll(logDir, 0755); err != nil {
+    // Determine the path to the Documents folder based on the OS
+    var documentsDir string
+    switch runtime.GOOS {
+    case "windows":
+        documentsDir = filepath.Join(homeDir, "Documents")
+    case "darwin", "linux":
+        documentsDir = filepath.Join(homeDir, "Documents") // macOS and Linux typically use ~/Documents
+    default:
+        fmt.Printf("Unsupported OS: %s\n", runtime.GOOS)
+        return nil
+    }
+
+    // Create a GoCrypt folder in the Documents directory
+    goCryptDir := filepath.Join(documentsDir, "GoCrypt")
+    logFilePath := filepath.Join(goCryptDir, "app.log")
+
+    // Ensure the GoCrypt log directory exists
+    if err := os.MkdirAll(goCryptDir, 0755); err != nil {
         fmt.Printf("Failed to create log directory: %v\n", err)
         return nil
     }
 
-    // Open the log file in append mode, create if it doesn't exist
+    // Open the log file in append mode, create it if it doesn't exist
     logFile, err := os.OpenFile(logFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
     if err != nil {
         fmt.Printf("Failed to open log file: %v\n", err)
         return nil
     }
 
-	// Create a logger that writes to both the log file and stdout, with custom timestamp format
-	return log.New(logFile, "GoCrypt: ", log.Ldate|log.Ltime|log.Lmicroseconds|log.Lshortfile)
+    // Create a logger that writes to both the log file and stdout, with custom timestamp format
+    return log.New(logFile, "GoCrypt: ", log.Ldate|log.Ltime|log.Lmicroseconds|log.Lshortfile)
 }
 
 // CheckFilesExist verifies whether the provided files exist. Returns a slice of non-existent files.
